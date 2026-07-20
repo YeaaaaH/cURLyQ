@@ -12,7 +12,13 @@ cURLyQ is a desktop Postman clone (send HTTP requests with headers/params/body, 
 - Backend: Rust, exposed to the frontend as Tauri commands (`#[tauri::command]`), invoked via `invoke(...)` from JS/TS.
 - HTTP requests are performed on the Rust side (not from the webview) and returned to the frontend.
 
-Project is not yet scaffolded — no build/lint/test commands exist yet. Once `npm create tauri-app` is run, update this section with the actual dev/build/test commands.
+Scaffolded via `npm create tauri-app` (react-ts template, npm package manager).
+
+- Dev (frontend + Tauri window): `npm run tauri dev`
+- Build release binary: `npm run tauri build`
+- Frontend-only dev server: `npm run dev`
+- Rust check: `cargo check` (run from `src-tauri/`)
+- No test framework set up yet.
 
 ## Workflow
 
