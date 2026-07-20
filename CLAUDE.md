@@ -8,7 +8,7 @@ cURLyQ is a desktop Postman clone (send HTTP requests with headers/params/body, 
 
 ## Stack
 
-- Frontend: TypeScript + React, in Tauri's webview.
+- Frontend: TypeScript + React, in Tauri's webview. Styled with Tailwind CSS v4 + shadcn/ui (see `.claude/skills/curlyq-ui/SKILL.md` for conventions).
 - Backend: Rust, exposed to the frontend as Tauri commands (`#[tauri::command]`), invoked via `invoke(...)` from JS/TS.
 - HTTP requests are performed on the Rust side (not from the webview) and returned to the frontend.
 
