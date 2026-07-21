@@ -35,11 +35,20 @@ interface HttpResponse {
   body: string;
 }
 
+type SubTab = "params" | "headers" | "body";
+
+const SUB_TABS: { id: SubTab; label: string }[] = [
+  { id: "params", label: "Params" },
+  { id: "headers", label: "Headers" },
+  { id: "body", label: "Body" },
+];
+
 interface RequestTab {
   id: string;
   name: string;
   method: string;
   url: string;
+  activeSubTab: SubTab;
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
@@ -51,6 +60,7 @@ function createRequestTab(): RequestTab {
     name: "Untitled request",
     method: "GET",
     url: "",
+    activeSubTab: "params",
     response: null,
     error: null,
     isSending: false,
@@ -197,6 +207,20 @@ function App() {
         </Button>
       </div>
 
+      <input
+        type="text"
+        value={activeRequest.name}
+        onChange={(e) => updateActiveRequest({ name: e.target.value })}
+        onBlur={() => {
+          if (activeRequest.name.trim() === "") {
+            updateActiveRequest({ name: "Untitled request" });
+          }
+        }}
+        placeholder="Untitled request"
+        aria-label="Request name"
+        className="-ml-2 w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+      />
+
       <form className="flex flex-col gap-1.5" onSubmit={handleSend}>
         <div className="flex gap-2">
           <Select
@@ -228,6 +252,32 @@ function App() {
         </div>
         {urlError && <p className="text-sm text-destructive">{urlError}</p>}
       </form>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex w-fit gap-1 rounded-lg bg-secondary p-1">
+          {SUB_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => updateActiveRequest({ activeSubTab: tab.id })}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                activeRequest.activeSubTab === tab.id
+                  ? "border border-input bg-background text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-h-[220px] rounded-lg border border-input p-3 text-sm text-muted-foreground">
+          {activeRequest.activeSubTab === "params" && "No query params yet."}
+          {activeRequest.activeSubTab === "headers" && "No headers yet."}
+          {activeRequest.activeSubTab === "body" && "No body yet."}
+        </div>
+      </div>
 
       {activeRequest.error && (
         <Card className="border-destructive">
