@@ -16,14 +16,45 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: "text-green-600",
+  POST: "text-amber-600",
+  PUT: "text-blue-600",
+  PATCH: "text-purple-600",
+  DELETE: "text-destructive",
+};
 
 interface HttpResponse {
   status: number;
   headers: Record<string, string>;
   body: string;
+}
+
+interface RequestTab {
+  id: string;
+  name: string;
+  method: string;
+  url: string;
+  response: HttpResponse | null;
+  error: string | null;
+  isSending: boolean;
+}
+
+function createRequestTab(): RequestTab {
+  return {
+    id: crypto.randomUUID(),
+    name: "Untitled request",
+    method: "GET",
+    url: "",
+    response: null,
+    error: null,
+    isSending: false,
+  };
 }
 
 function formatBody(body: string): string {
@@ -56,37 +87,122 @@ function getUrlError(url: string): string | null {
 }
 
 function App() {
-  const [method, setMethod] = useState("GET");
-  const [url, setUrl] = useState("");
-  const [response, setResponse] = useState<HttpResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
+  const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
+  const [activeId, setActiveId] = useState(() => requests[0].id);
 
-  const isUrlEmpty = url.trim() === "";
-  const urlError = getUrlError(url);
+  const activeRequest = requests.find((r) => r.id === activeId)!;
+
+  function updateActiveRequest(patch: Partial<RequestTab>) {
+    setRequests((prev) => prev.map((r) => (r.id === activeId ? { ...r, ...patch } : r)));
+  }
+
+  function handleAddTab() {
+    const tab = createRequestTab();
+    setRequests((prev) => [...prev, tab]);
+    setActiveId(tab.id);
+  }
+
+  function handleCloseTab(id: string) {
+    const closingIndex = requests.findIndex((r) => r.id === id);
+    const remaining = requests.filter((r) => r.id !== id);
+
+    if (remaining.length === 0) {
+      const fresh = createRequestTab();
+      setRequests([fresh]);
+      setActiveId(fresh.id);
+      return;
+    }
+
+    setRequests(remaining);
+    if (id === activeId) {
+      const newActiveIndex = Math.min(closingIndex, remaining.length - 1);
+      setActiveId(remaining[newActiveIndex].id);
+    }
+  }
+
+  function handleTabsWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (e.deltaY === 0) return;
+    e.currentTarget.scrollLeft += e.deltaY;
+  }
+
+  const isUrlEmpty = activeRequest.url.trim() === "";
+  const urlError = getUrlError(activeRequest.url);
   const canSend = !isUrlEmpty && !urlError;
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
-    setError(null);
-    setResponse(null);
-    setIsSending(true);
+    const { method, url } = activeRequest;
+    updateActiveRequest({ error: null, response: null, isSending: true });
     try {
       const result = await invoke<HttpResponse>("send_request", { method, url });
-      setResponse(result);
+      updateActiveRequest({ response: result, isSending: false });
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setIsSending(false);
+      updateActiveRequest({ error: String(err), isSending: false });
     }
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-5 p-8">
+    <main className="flex flex-col gap-5 p-8">
+      <div className="flex items-center gap-1.5">
+        <div
+          className="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto"
+          onWheel={handleTabsWheel}
+        >
+          {requests.map((tab) => (
+            <div
+              key={tab.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setActiveId(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setActiveId(tab.id);
+              }}
+              className={cn(
+                "flex shrink-0 cursor-default items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                tab.id === activeId
+                  ? "border border-input bg-background"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className={cn("text-xs font-semibold", METHOD_COLORS[tab.method])}>
+                {tab.method}
+              </span>
+              <span className={tab.id === activeId ? "text-foreground" : undefined}>
+                {tab.name}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCloseTab(tab.id);
+                }}
+                aria-label={`Close ${tab.name}`}
+                className="rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleAddTab}
+          aria-label="New request tab"
+          className="shrink-0"
+        >
+          <Plus />
+        </Button>
+      </div>
+
       <form className="flex flex-col gap-1.5" onSubmit={handleSend}>
         <div className="flex gap-2">
-          <Select value={method} onValueChange={setMethod}>
+          <Select
+            value={activeRequest.method}
+            onValueChange={(method) => updateActiveRequest({ method })}
+          >
             <SelectTrigger className="w-28 font-semibold">
               <SelectValue />
             </SelectTrigger>
@@ -101,45 +217,48 @@ function App() {
           <Input
             className="font-mono aria-invalid:border-destructive"
             type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            value={activeRequest.url}
+            onChange={(e) => updateActiveRequest({ url: e.target.value })}
             placeholder="https://example.com"
             aria-invalid={urlError !== null}
           />
-          <Button type="submit" disabled={isSending || !canSend}>
-            {isSending ? "Sending…" : "Send"}
+          <Button type="submit" disabled={activeRequest.isSending || !canSend}>
+            {activeRequest.isSending ? "Sending…" : "Send"}
           </Button>
         </div>
         {urlError && <p className="text-sm text-destructive">{urlError}</p>}
       </form>
 
-      {error && (
+      {activeRequest.error && (
         <Card className="border-destructive">
           <CardContent>
             <p className="mb-2 font-semibold text-destructive">Error</p>
             <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words font-mono text-sm text-destructive">
-              {error}
+              {activeRequest.error}
             </pre>
           </CardContent>
         </Card>
       )}
 
-      {response && (
+      {activeRequest.response && (
         <Card className="gap-0 py-0">
           <div className="flex items-center border-b px-4 py-3">
-            <Badge variant={statusVariant(response.status)} className="font-mono text-sm">
-              {response.status}
+            <Badge
+              variant={statusVariant(activeRequest.response.status)}
+              className="font-mono text-sm"
+            >
+              {activeRequest.response.status}
             </Badge>
           </div>
 
-          {Object.keys(response.headers).length > 0 && (
+          {Object.keys(activeRequest.response.headers).length > 0 && (
             <Collapsible className="border-b">
               <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-                Headers ({Object.keys(response.headers).length})
+                Headers ({Object.keys(activeRequest.response.headers).length})
                 <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="max-h-[200px] overflow-auto px-4 pb-2 font-mono text-sm">
-                {Object.entries(response.headers).map(([name, value]) => (
+                {Object.entries(activeRequest.response.headers).map(([name, value]) => (
                   <div className="flex gap-2 py-0.5" key={name}>
                     <span className="text-muted-foreground">{name}</span>
                     <span className="break-all">{value}</span>
@@ -150,7 +269,7 @@ function App() {
           )}
 
           <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-sm">
-            {formatBody(response.body)}
+            {formatBody(activeRequest.response.body)}
           </pre>
         </Card>
       )}
