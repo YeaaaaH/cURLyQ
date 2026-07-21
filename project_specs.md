@@ -15,12 +15,12 @@ In scope:
 - **Send request** — frontend calls a Rust command that performs the HTTP request and returns status/headers/body.
 - **Response viewer** — status code, response headers, response body (pretty-printed for JSON). Not persisted.
 - **Tabs** — multiple requests open at once in-session (like browser/Postman tabs). No persistence across app restarts in v1.
+- **Saving/loading individual requests to disk** — so requests survive app restarts.
+- **Environment variables / variable substitution** (e.g. `{{baseUrl}}`) across requests.
 
 Explicitly out of scope for v1 (revisit later):
-- Saving/loading individual requests to disk.
 - Collections/folders.
 - Built-in auth helpers (Bearer, Basic, OAuth, etc.) — v1 relies on raw headers only.
-- Environment variables / variable substitution.
 - Request history.
 
 ## Workflow
