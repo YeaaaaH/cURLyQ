@@ -37,7 +37,7 @@ the app's own Tailwind/shadcn tokens (Geist font, neutral OKLCH palette, 10px ba
   tsconfig.json`) after every edit, rely on Vite HMR for live verification instead of
   restarting the dev server, and only commit/push when explicitly asked.
 
-## Step 1: Headers tab
+## Step 1: Headers tab — DONE
 
 Replace the `"No headers yet."` placeholder with a row editor identical in structure to
 Params (same `KeyValuePair`, same self-growing-row/enabled-checkbox/trash-icon pattern),
@@ -59,7 +59,7 @@ but:
   surface as the existing `.map_err(|e| e.to_string())` error path) — keep this
   consistent with how `method`/`url` parsing errors are already surfaced.
 
-## Step 2: Body tab
+## Step 2: Body tab — DONE
 
 - Add `body: string` to `RequestTab` (defaults to `""`).
 - Replace the `"No body yet."` placeholder with a `<textarea>`-style input (monospace,
@@ -67,56 +67,87 @@ but:
 - Per `project_specs.md`, v1 body support is raw text/JSON — no schema validation
   required, but consider a lightweight "invalid JSON" hint (non-blocking, similar to
   `getUrlError`) since the panel is JSON-flavored.
-- **Open decision — confirm with the user before implementing**: should a
-  `Content-Type: application/json` header be auto-set when the body is non-empty and
-  the user hasn't already added their own `Content-Type` row in Headers? v1 scope says
-  "raw headers only" (no auth helpers), but this is a body-encoding default, not an auth
-  helper — worth a quick check-in either way rather than assuming.
+- **Resolved**: auto-set `Content-Type: application/json` when the body is non-empty
+  and no `Content-Type` row already exists in Headers (case-insensitive match) — v1
+  only ever sends JSON bodies, so this is a safe default. A content-type dropdown
+  (JSON/text/form/etc.) is deferred until non-JSON bodies are actually supported.
 - Body should be sendable regardless of HTTP method (don't restrict to POST/PUT/PATCH
   only) — matches how Postman/Insomnia behave and keeps the UI simple.
+- Extra UX polish added beyond the original plan: Tab inserts a 2-space indent instead
+  of moving focus (`handleBodyKeyDown`), triple-or-more click selects the whole body
+  (`onMouseDown` intercept at `e.detail >= 3`, `preventDefault` + `.select()` to avoid
+  the native per-click-count selection flicker), and the panel uses a filled
+  background (`bg-muted/60`, no border, `resize-none`) instead of a nested bordered
+  box to avoid a double-container look.
 
 ### Rust side
 
 - `send_request` needs an optional body parameter, e.g. `body: Option<String>`.
 - Apply via `.body(body)` on the request builder only when `Some` and non-empty.
 
-## Step 3: Save/load requests to disk
+## Step 3: Persist open tabs across restarts — DONE
 
-Needs Headers + Body settled first — the `RequestTab` shape being serialized should be
-final (or close to it) before writing a persistence format, to avoid migrating it twice.
+**Scope clarified during implementation**: this is tab-session restore (like a browser
+restoring previous tabs), not a Postman-style "saved requests" library. No explicit
+Save action — Ctrl+S/a Save button was considered but rejected, since in Postman that
+gesture means "save to a collection," which doesn't exist yet (see the CI/CD-adjacent,
+still-deferred collections feature). Instead:
 
-- Persist a **subset** of `RequestTab`: `name`, `method`, `url`, `params`, `headers`,
-  `body`. Exclude transient fields (`response`, `error`, `isSending`, `activeSubTab`) —
-  those don't belong in a saved request.
-- Storage location: Tauri's app data dir (`app_handle.path().app_data_dir()` in Tauri
-  2.x), as a JSON file. Start simple — one file holding an array of saved requests —
-  rather than one file per request, unless the list grows large enough to matter.
-- New Rust commands: `save_requests(requests: Vec<SavedRequest>) -> Result<(), String>`
-  and `load_requests() -> Result<Vec<SavedRequest>, String>`. Simplest v1 shape: save the
-  *entire* current tab list on every save, rather than per-request diffing.
-- **Open decision — confirm with the user before implementing**: explicit "Save" action
-  (button/shortcut) vs. autosave on every edit? Explicit save is simpler, more
-  predictable, and avoids writing to disk on every keystroke — recommended default, but
-  flag it rather than assume.
-- On app startup, load persisted requests into tabs instead of always starting with one
-  blank tab (fall back to a single blank tab if nothing is persisted yet).
+- `PersistedTab` (Rust) — the on-disk subset of `RequestTab`: `id`, `name`, `method`,
+  `url`, `params`, `headers`, `body`. Excludes `response`, `error`, `isSending`,
+  `activeSubTab` — no responses are persisted, matching the user's explicit ask.
+- Storage: `tabs.json` in Tauri's `app_data_dir()` (`C:\Users\<user>\AppData\Roaming\
+  cURLyQ\tabs.json` on Windows, after the identifier rename from `com.curlyq.app`).
+  Whole-list write, no per-tab diffing.
+- Rust commands `save_tabs`/`load_tabs`, registered in `generate_handler!`.
+- Frontend: debounced autosave (500ms after the last change to `requests`) via a
+  `useEffect`, no dirty-flag tracking, no button, no keyboard shortcut. On mount, a
+  separate `useEffect` calls `load_tabs` and replaces the initial blank tab if
+  anything was persisted.
+- A real "saved requests" / collections library (with an explicit save gesture) is a
+  separate future feature, not this one.
 
 ## Step 4: Environment variables
 
 Also sequenced after Headers + Body, and benefits from Step 3's persistence plumbing
-(environments should likely be saved the same way).
+(environments are saved the same way, via a new `environments.json`).
 
 - An "environment" is a named set of key/value variables (e.g. `baseUrl` →
   `https://api.example.com`), substituted via `{{varName}}` syntax.
-- Substitution point: a pure function `substituteVariables(text, env)` applied to the
-  URL, header values, and body right before `buildRequestUrl`/send — not stored
-  substituted, so the raw `{{varName}}` stays visible/editable in the UI.
-- **Open decision — confirm with the user before implementing**: v1 could start with a
-  single flat set of variables (simplest), or multiple named environments with a
-  switcher (closer to Postman, more UI work). Recommend starting flat and upgrading
-  later if needed, but don't assume.
-- UI: needs some place to define/edit variables — a small separate panel/dialog, not
-  part of the per-tab Params/Headers/Body area since variables are shared across tabs.
+- **Resolved**: multiple named environments (Dev/Staging/Prod-style), only one active
+  at a time — matches Postman's actual behavior (upload/define several environments,
+  switch which is active, e.g. `{{baseUrl}}` resolves differently per environment).
+  Not a single flat variable set.
+- Substitution point: a pure function `substituteVariables(text, activeEnvironment)`
+  applied to the URL, header values, and body right before `buildRequestUrl`/send —
+  not stored substituted, so the raw `{{varName}}` stays visible/editable in the UI.
+
+### Data model
+
+- `Environment { id, name, variables: KeyValuePair[] }` — reuses the existing
+  `KeyValuePair` shape, so enabling/disabling a variable works the same as it does for
+  Params/Headers.
+- App-level state (not per-tab, since environments are shared across all open tabs):
+  `environments: Environment[]` plus `activeEnvironmentId: string | null`.
+- Persisted the same way as tabs (Step 3's pattern): `environments.json` in
+  `app_data_dir()`, autosaved debounced on change, loaded on mount. New Rust commands
+  `save_environments`/`load_environments`, mirroring `save_tabs`/`load_tabs` exactly —
+  no other Rust changes needed, since substitution itself is pure frontend logic
+  applied before `invoke`.
+
+### UI
+
+- **Resolved**: a dedicated environment-editor view, closer to Postman's actual
+  layout, rather than a lightweight inline panel — a list of environments on one side
+  (create/rename/delete), the selected environment's variables (`KeyValuePair` rows,
+  same editor pattern as Params/Headers) on the other.
+- A separate, smaller dropdown near the tab bar shows the currently active
+  environment and lets the user switch it without opening the full editor — opening
+  the editor itself is a secondary action (e.g. a "Manage environments" entry in that
+  dropdown).
+- Non-blocking hint for unresolved variables at send time (e.g. `{{baseUrl}}` typed
+  but no `baseUrl` in the active environment, or no environment selected) — same
+  spirit as `getUrlError`/`getBodyError`, doesn't block Send, just surfaces the issue.
 
 ## Stretch: Copy as cURL
 

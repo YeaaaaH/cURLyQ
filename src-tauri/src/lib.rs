@@ -1,5 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tauri::Manager;
 
 #[derive(Serialize)]
 struct HttpResponse {
@@ -8,11 +9,31 @@ struct HttpResponse {
     body: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct KeyValuePair {
+    id: String,
+    key: String,
+    value: String,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct PersistedTab {
+    id: String,
+    name: String,
+    method: String,
+    url: String,
+    params: Vec<KeyValuePair>,
+    headers: Vec<KeyValuePair>,
+    body: String,
+}
+
 #[tauri::command]
 async fn send_request(
     method: String,
     url: String,
     headers: Vec<(String, String)>,
+    body: Option<String>,
 ) -> Result<HttpResponse, String> {
     let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
 
@@ -20,6 +41,9 @@ async fn send_request(
     let mut request = client.request(method, &url);
     for (name, value) in headers {
         request = request.header(name, value);
+    }
+    if let Some(body) = body {
+        request = request.body(body);
     }
     let response = request.send().await.map_err(|e| e.to_string())?;
 
@@ -43,11 +67,34 @@ async fn send_request(
     })
 }
 
+fn tabs_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("tabs.json"))
+}
+
+#[tauri::command]
+fn save_tabs(app: tauri::AppHandle, tabs: Vec<PersistedTab>) -> Result<(), String> {
+    let path = tabs_file_path(&app)?;
+    let json = serde_json::to_string_pretty(&tabs).map_err(|e| e.to_string())?;
+    std::fs::write(path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_tabs(app: tauri::AppHandle) -> Result<Vec<PersistedTab>, String> {
+    let path = tabs_file_path(&app)?;
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&json).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![send_request])
+        .invoke_handler(tauri::generate_handler![send_request, save_tabs, load_tabs])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,7 @@ interface RequestTab {
   activeSubTab: SubTab;
   params: KeyValuePair[];
   headers: KeyValuePair[];
+  body: string;
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
@@ -73,6 +74,34 @@ function createRequestTab(): RequestTab {
     activeSubTab: "params",
     params: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
     headers: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
+    body: "",
+    response: null,
+    error: null,
+    isSending: false,
+  };
+}
+
+// The on-disk shape: everything in RequestTab except the transient,
+// never-persisted fields (activeSubTab, response, error, isSending).
+interface PersistedTab {
+  id: string;
+  name: string;
+  method: string;
+  url: string;
+  params: KeyValuePair[];
+  headers: KeyValuePair[];
+  body: string;
+}
+
+function toPersistedTab(tab: RequestTab): PersistedTab {
+  const { id, name, method, url, params, headers, body } = tab;
+  return { id, name, method, url, params, headers, body };
+}
+
+function fromPersistedTab(saved: PersistedTab): RequestTab {
+  return {
+    ...saved,
+    activeSubTab: "params",
     response: null,
     error: null,
     isSending: false,
@@ -106,6 +135,16 @@ function getUrlError(url: string): string | null {
     return "URL must start with http:// or https://";
   }
   return null;
+}
+
+function getBodyError(body: string): string | null {
+  if (body.trim() === "") return null;
+  try {
+    JSON.parse(body);
+    return null;
+  } catch {
+    return "Body is not valid JSON";
+  }
 }
 
 function buildRequestUrl(rawUrl: string, params: KeyValuePair[]): string {
@@ -228,6 +267,25 @@ function App() {
 
   const activeRequest = requests.find((r) => r.id === activeId)!;
 
+  // Restore tabs left open from the previous session, if any were saved.
+  useEffect(() => {
+    invoke<PersistedTab[]>("load_tabs").then((saved) => {
+      if (saved.length === 0) return;
+      const restored = saved.map(fromPersistedTab);
+      setRequests(restored);
+      setActiveId(restored[0].id);
+    });
+  }, []);
+
+  // Quietly keep disk in sync with whatever's currently open, debounced so a
+  // burst of keystrokes doesn't trigger a write per character.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      invoke("save_tabs", { tabs: requests.map(toPersistedTab) });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [requests]);
+
   function updateActiveRequest(patch: Partial<RequestTab>) {
     setRequests((prev) => prev.map((r) => (r.id === activeId ? { ...r, ...patch } : r)));
   }
@@ -279,6 +337,18 @@ function App() {
     updateActiveRequest({ headers: removeRow(activeRequest.headers, index) });
   }
 
+  function handleBodyKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    const textarea = e.currentTarget;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const cursor = selectionStart + 2;
+    updateActiveRequest({ body: value.slice(0, selectionStart) + "  " + value.slice(selectionEnd) });
+    // Controlled textareas don't preserve cursor position on programmatic value
+    // changes, so restore it manually once React commits the new value.
+    requestAnimationFrame(() => textarea.setSelectionRange(cursor, cursor));
+  }
+
   function handleUrlChange(rawUrl: string) {
     if (rawUrl.trim() === "") {
       updateActiveRequest({
@@ -304,22 +374,31 @@ function App() {
 
   const isUrlEmpty = activeRequest.url.trim() === "";
   const urlError = getUrlError(activeRequest.url);
+  const bodyError = getBodyError(activeRequest.body);
   const canSend = !isUrlEmpty && !urlError;
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
-    const { method, url, params, headers } = activeRequest;
+    const { method, url, params, headers, body } = activeRequest;
     const requestUrl = buildRequestUrl(url, params);
     const requestHeaders = headers
       .filter(({ key, enabled }) => enabled && key.trim() !== "")
       .map(({ key, value }) => [key, value] as [string, string]);
+
+    const trimmedBody = body.trim();
+    const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
+    if (trimmedBody !== "" && !hasContentType) {
+      requestHeaders.push(["Content-Type", "application/json"]);
+    }
+
     updateActiveRequest({ error: null, response: null, isSending: true });
     try {
       const result = await invoke<HttpResponse>("send_request", {
         method,
         url: requestUrl,
         headers: requestHeaders,
+        body: trimmedBody === "" ? null : body,
       });
       updateActiveRequest({ response: result, isSending: false });
     } catch (err) {
@@ -455,7 +534,25 @@ function App() {
             {activeRequest.activeSubTab === "headers" && (
               <KeyValueEditor rows={activeRequest.headers} onUpdate={updateHeader} onRemove={removeHeader} />
             )}
-            {activeRequest.activeSubTab === "body" && "No body yet."}
+            {activeRequest.activeSubTab === "body" && (
+              <div className="flex flex-col gap-1.5">
+                <textarea
+                  className="min-h-[180px] w-full resize-none rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:ring-2 aria-invalid:ring-destructive"
+                  placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
+                  value={activeRequest.body}
+                  onChange={(e) => updateActiveRequest({ body: e.target.value })}
+                  onKeyDown={handleBodyKeyDown}
+                  onMouseDown={(e) => {
+                    if (e.detail < 3) return;
+                    e.preventDefault();
+                    e.currentTarget.select();
+                  }}
+                  aria-invalid={bodyError !== null}
+                  spellCheck={false}
+                />
+                {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>
