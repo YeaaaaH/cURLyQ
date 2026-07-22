@@ -80,6 +80,44 @@ but:
 - `send_request` needs an optional body parameter, e.g. `body: Option<String>`.
 - Apply via `.body(body)` on the request builder only when `Some` and non-empty.
 
+## Step 3: Save/load requests to disk
+
+Needs Headers + Body settled first — the `RequestTab` shape being serialized should be
+final (or close to it) before writing a persistence format, to avoid migrating it twice.
+
+- Persist a **subset** of `RequestTab`: `name`, `method`, `url`, `params`, `headers`,
+  `body`. Exclude transient fields (`response`, `error`, `isSending`, `activeSubTab`) —
+  those don't belong in a saved request.
+- Storage location: Tauri's app data dir (`app_handle.path().app_data_dir()` in Tauri
+  2.x), as a JSON file. Start simple — one file holding an array of saved requests —
+  rather than one file per request, unless the list grows large enough to matter.
+- New Rust commands: `save_requests(requests: Vec<SavedRequest>) -> Result<(), String>`
+  and `load_requests() -> Result<Vec<SavedRequest>, String>`. Simplest v1 shape: save the
+  *entire* current tab list on every save, rather than per-request diffing.
+- **Open decision — confirm with the user before implementing**: explicit "Save" action
+  (button/shortcut) vs. autosave on every edit? Explicit save is simpler, more
+  predictable, and avoids writing to disk on every keystroke — recommended default, but
+  flag it rather than assume.
+- On app startup, load persisted requests into tabs instead of always starting with one
+  blank tab (fall back to a single blank tab if nothing is persisted yet).
+
+## Step 4: Environment variables
+
+Also sequenced after Headers + Body, and benefits from Step 3's persistence plumbing
+(environments should likely be saved the same way).
+
+- An "environment" is a named set of key/value variables (e.g. `baseUrl` →
+  `https://api.example.com`), substituted via `{{varName}}` syntax.
+- Substitution point: a pure function `substituteVariables(text, env)` applied to the
+  URL, header values, and body right before `buildRequestUrl`/send — not stored
+  substituted, so the raw `{{varName}}` stays visible/editable in the UI.
+- **Open decision — confirm with the user before implementing**: v1 could start with a
+  single flat set of variables (simplest), or multiple named environments with a
+  switcher (closer to Postman, more UI work). Recommend starting flat and upgrading
+  later if needed, but don't assume.
+- UI: needs some place to define/edit variables — a small separate panel/dialog, not
+  part of the per-tab Params/Headers/Body area since variables are shared across tabs.
+
 ## Stretch: Copy as cURL
 
 Frontend-only — no Rust changes needed, since by send time the full request (method,
@@ -98,13 +136,3 @@ final percent-encoded URL, enabled headers, body) is already assembled in JS.
 
 - Collections/folders, built-in auth helpers, request history. Don't build toward
   these unless the user changes scope.
-
-## Now in v1 scope, but not part of this plan
-
-`project_specs.md` was updated to move **saving/loading requests to disk** and
-**environment variables / variable substitution** into v1 scope. Both are real
-features, not small additions to the current Headers/Body work, so they deserve their
-own `.tasks/<name>/PLAN.md` when picked up rather than being folded in here. Worth
-noting now since they'll likely interact with this feature (e.g. env var substitution
-needs to run on whatever `url`/`headers`/`body` look like by the time Headers/Body
-land, and "save request" needs a settled `RequestTab` shape to serialize).

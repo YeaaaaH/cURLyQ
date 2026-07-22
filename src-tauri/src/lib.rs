@@ -9,15 +9,19 @@ struct HttpResponse {
 }
 
 #[tauri::command]
-async fn send_request(method: String, url: String) -> Result<HttpResponse, String> {
+async fn send_request(
+    method: String,
+    url: String,
+    headers: Vec<(String, String)>,
+) -> Result<HttpResponse, String> {
     let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
 
     let client = reqwest::Client::new();
-    let response = client
-        .request(method, &url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let mut request = client.request(method, &url);
+    for (name, value) in headers {
+        request = request.header(name, value);
+    }
+    let response = request.send().await.map_err(|e| e.to_string())?;
 
     let status = response.status().as_u16();
     let headers = response

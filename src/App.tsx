@@ -58,6 +58,7 @@ interface RequestTab {
   url: string;
   activeSubTab: SubTab;
   params: KeyValuePair[];
+  headers: KeyValuePair[];
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
@@ -71,6 +72,7 @@ function createRequestTab(): RequestTab {
     url: "",
     activeSubTab: "params",
     params: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
+    headers: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
     response: null,
     error: null,
     isSending: false,
@@ -141,6 +143,85 @@ function syncUrlWithParams(rawUrl: string, params: KeyValuePair[]): string {
   }
 }
 
+// Shared self-growing-row logic for Params/Headers: always keeps exactly one
+// trailing empty row in state so there's a stable place to type a new entry.
+function updateRows(
+  rows: KeyValuePair[],
+  index: number,
+  patch: Partial<KeyValuePair>
+): KeyValuePair[] {
+  const next = rows.map((r, i) => (i === index ? { ...r, ...patch } : r));
+  const last = next[next.length - 1];
+  if (last.key.trim() !== "" || last.value.trim() !== "") {
+    next.push({ id: crypto.randomUUID(), key: "", value: "", enabled: true });
+  }
+  return next;
+}
+
+function removeRow(rows: KeyValuePair[], index: number): KeyValuePair[] {
+  const remaining = rows.filter((_, i) => i !== index);
+  return remaining.length > 0
+    ? remaining
+    : [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }];
+}
+
+function KeyValueEditor({
+  rows,
+  onUpdate,
+  onRemove,
+}: {
+  rows: KeyValuePair[];
+  onUpdate: (index: number, patch: Partial<KeyValuePair>) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="w-4" />
+        <span className="flex-1">Key</span>
+        <span className="flex-1">Value</span>
+        <span className="w-8" />
+      </div>
+      {rows.map((row, index) => {
+        const isTrailingEmpty =
+          index === rows.length - 1 && row.key.trim() === "" && row.value.trim() === "";
+        return (
+          <div key={row.id} className={cn("flex items-center gap-2", !row.enabled && "opacity-50")}>
+            <Checkbox
+              checked={row.enabled}
+              onCheckedChange={(checked) => onUpdate(index, { enabled: checked === true })}
+              aria-label={`Include ${row.key} in request`}
+              className={isTrailingEmpty ? "invisible" : undefined}
+            />
+            <Input
+              className="font-mono"
+              placeholder="key"
+              value={row.key}
+              onChange={(e) => onUpdate(index, { key: e.target.value })}
+            />
+            <Input
+              className="font-mono"
+              placeholder="value"
+              value={row.value}
+              onChange={(e) => onUpdate(index, { value: e.target.value })}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemove(index)}
+              aria-label="Remove row"
+              className={isTrailingEmpty ? "invisible" : undefined}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
   const [activeId, setActiveId] = useState(() => requests[0].id);
@@ -181,21 +262,21 @@ function App() {
   }
 
   function updateParam(index: number, patch: Partial<KeyValuePair>) {
-    const params = activeRequest.params.map((p, i) => (i === index ? { ...p, ...patch } : p));
-    const last = params[params.length - 1];
-    if (last.key.trim() !== "" || last.value.trim() !== "") {
-      params.push({ id: crypto.randomUUID(), key: "", value: "", enabled: true });
-    }
+    const params = updateRows(activeRequest.params, index, patch);
     updateActiveRequest({ params, url: syncUrlWithParams(activeRequest.url, params) });
   }
 
   function removeParam(index: number) {
-    const remaining = activeRequest.params.filter((_, i) => i !== index);
-    const params =
-      remaining.length > 0
-        ? remaining
-        : [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }];
+    const params = removeRow(activeRequest.params, index);
     updateActiveRequest({ params, url: syncUrlWithParams(activeRequest.url, params) });
+  }
+
+  function updateHeader(index: number, patch: Partial<KeyValuePair>) {
+    updateActiveRequest({ headers: updateRows(activeRequest.headers, index, patch) });
+  }
+
+  function removeHeader(index: number) {
+    updateActiveRequest({ headers: removeRow(activeRequest.headers, index) });
   }
 
   function handleUrlChange(rawUrl: string) {
@@ -228,11 +309,18 @@ function App() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
-    const { method, url, params } = activeRequest;
+    const { method, url, params, headers } = activeRequest;
     const requestUrl = buildRequestUrl(url, params);
+    const requestHeaders = headers
+      .filter(({ key, enabled }) => enabled && key.trim() !== "")
+      .map(({ key, value }) => [key, value] as [string, string]);
     updateActiveRequest({ error: null, response: null, isSending: true });
     try {
-      const result = await invoke<HttpResponse>("send_request", { method, url: requestUrl });
+      const result = await invoke<HttpResponse>("send_request", {
+        method,
+        url: requestUrl,
+        headers: requestHeaders,
+      });
       updateActiveRequest({ response: result, isSending: false });
     } catch (err) {
       updateActiveRequest({ error: String(err), isSending: false });
@@ -362,57 +450,11 @@ function App() {
 
           <div className="min-h-[220px] rounded-lg border border-input p-3 text-sm text-muted-foreground">
             {activeRequest.activeSubTab === "params" && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <span className="w-4" />
-                  <span className="flex-1">Key</span>
-                  <span className="flex-1">Value</span>
-                  <span className="w-8" />
-                </div>
-                {activeRequest.params.map((param, index) => {
-                  const isTrailingEmpty =
-                    index === activeRequest.params.length - 1 &&
-                    param.key.trim() === "" &&
-                    param.value.trim() === "";
-                  return (
-                    <div
-                      key={param.id}
-                      className={cn("flex items-center gap-2", !param.enabled && "opacity-50")}
-                    >
-                      <Checkbox
-                        checked={param.enabled}
-                        onCheckedChange={(checked) => updateParam(index, { enabled: checked === true })}
-                        aria-label={`Include ${param.key} in request`}
-                        className={isTrailingEmpty ? "invisible" : undefined}
-                      />
-                      <Input
-                        className="font-mono"
-                        placeholder="key"
-                        value={param.key}
-                        onChange={(e) => updateParam(index, { key: e.target.value })}
-                      />
-                      <Input
-                        className="font-mono"
-                        placeholder="value"
-                        value={param.value}
-                        onChange={(e) => updateParam(index, { value: e.target.value })}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeParam(index)}
-                        aria-label="Remove param"
-                        className={isTrailingEmpty ? "invisible" : undefined}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
+              <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
             )}
-            {activeRequest.activeSubTab === "headers" && "No headers yet."}
+            {activeRequest.activeSubTab === "headers" && (
+              <KeyValueEditor rows={activeRequest.headers} onUpdate={updateHeader} onRemove={removeHeader} />
+            )}
             {activeRequest.activeSubTab === "body" && "No body yet."}
           </div>
         </div>
