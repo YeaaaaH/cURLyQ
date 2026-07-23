@@ -17,7 +17,21 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Plus, Trash2, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Globe, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -49,6 +63,49 @@ interface KeyValuePair {
   key: string;
   value: string;
   enabled: boolean;
+}
+
+interface Environment {
+  id: string;
+  name: string;
+  variables: KeyValuePair[];
+}
+
+function createEnvironment(name: string): Environment {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    variables: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
+  };
+}
+
+// New environments are named after world capitals rather than "Environment
+// N" — picking the first one not already in use also sidesteps the old
+// collision bug where a count-based number (existing.length + 1) drifted out
+// of sync once something in the middle of the list got deleted.
+const CAPITAL_NAMES = [
+  "Amsterdam", "Ankara", "Athens", "Baghdad", "Bangkok", "Beijing", "Berlin", "Bogota",
+  "Brasilia", "Brussels", "Bucharest", "Budapest", "Buenos Aires", "Cairo", "Canberra",
+  "Copenhagen", "Dakar", "Damascus", "Dhaka", "Dublin", "Hanoi", "Havana", "Helsinki",
+  "Islamabad", "Jakarta", "Kyiv", "Lima", "Lisbon", "London", "Madrid", "Manila",
+  "Mexico City", "Vilnius", "Nairobi", "New Delhi", "Oslo", "Ottawa", "Paris", "Prague",
+  "Quito", "Riga", "Riyadh", "Rome", "Santiago", "Seoul", "Singapore", "Sofia",
+  "Stockholm", "Tallinn", "Tokyo", "Vienna", "Warsaw", "Wellington", "Zagreb",
+];
+
+function nextEnvironmentName(existing: Environment[]): string {
+  const usedNames = new Set(existing.map((e) => e.name));
+  const capital = CAPITAL_NAMES.find((name) => !usedNames.has(name));
+  if (capital) return capital;
+  // Every capital in the list is already taken — cycle through the list
+  // again with an incrementing suffix ("London 2", "Paris 2", ...) rather
+  // than switching to a differently-themed fallback name.
+  for (let iteration = 2; ; iteration++) {
+    const capitalForIteration = CAPITAL_NAMES.find(
+      (name) => !usedNames.has(`${name} ${iteration}`)
+    );
+    if (capitalForIteration) return `${capitalForIteration} ${iteration}`;
+  }
 }
 
 interface RequestTab {
@@ -122,12 +179,46 @@ function statusVariant(status: number): "default" | "secondary" | "destructive" 
   return "destructive";
 }
 
-function getUrlError(url: string): string | null {
+// Replaces {{varName}} with the matching enabled variable's value from the
+// active environment. Unresolved placeholders (no active environment, or no
+// matching enabled variable) are left as-is — substitution only ever happens
+// on a copy used for validation/sending, never written back into state, so
+// the raw {{varName}} stays visible and editable in the UI.
+function substituteVariables(text: string, environment: Environment | null): string {
+  if (!environment) return text;
+  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (placeholder, name) => {
+    const variable = environment.variables.find((v) => v.enabled && v.key === name);
+    return variable ? variable.value : placeholder;
+  });
+}
+
+function findVariableNames(text: string): string[] {
+  return [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
+}
+
+// Scans the given texts for {{varName}} placeholders that wouldn't resolve
+// against the active environment, for a non-blocking UI hint.
+function getUnresolvedVariables(texts: string[], environment: Environment | null): string[] {
+  const resolvedKeys = new Set(
+    (environment?.variables ?? [])
+      .filter((v) => v.enabled && v.key.trim() !== "")
+      .map((v) => v.key)
+  );
+  const unresolved = new Set<string>();
+  for (const text of texts) {
+    for (const name of findVariableNames(text)) {
+      if (!resolvedKeys.has(name)) unresolved.add(name);
+    }
+  }
+  return [...unresolved];
+}
+
+function getUrlError(url: string, environment: Environment | null): string | null {
   const trimmed = url.trim();
   if (trimmed === "") return null;
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(substituteVariables(trimmed, environment));
   } catch {
     return "Enter a full URL, e.g. https://example.com";
   }
@@ -165,21 +256,23 @@ function escapeForDisplay(value: string): string {
   return value.replace(/[&=#]/g, (ch) => encodeURIComponent(ch));
 }
 
+// Plain string splicing rather than the URL API, so this also works for
+// template URLs like {{baseUrl}}/path that aren't parseable as absolute URLs.
 function buildDisplayUrl(rawUrl: string, params: KeyValuePair[]): string {
-  const url = new URL(rawUrl);
+  const hashIndex = rawUrl.indexOf("#");
+  const hash = hashIndex === -1 ? "" : rawUrl.slice(hashIndex);
+  const withoutHash = hashIndex === -1 ? rawUrl : rawUrl.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  const base = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
   const query = params
     .filter(({ key, enabled }) => enabled && key.trim() !== "")
     .map(({ key, value }) => `${escapeForDisplay(key)}=${escapeForDisplay(value)}`)
     .join("&");
-  return `${url.origin}${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
+  return `${base}${query ? `?${query}` : ""}${hash}`;
 }
 
 function syncUrlWithParams(rawUrl: string, params: KeyValuePair[]): string {
-  try {
-    return buildDisplayUrl(rawUrl, params);
-  } catch {
-    return rawUrl;
-  }
+  return buildDisplayUrl(rawUrl, params);
 }
 
 // Shared self-growing-row logic for Params/Headers: always keeps exactly one
@@ -261,11 +354,224 @@ function KeyValueEditor({
   );
 }
 
+function EnvironmentEditor({
+  environments,
+  editingId,
+  onSelectEditing,
+  onAdd,
+  onRename,
+  onDelete,
+  onUpdateVariable,
+  onRemoveVariable,
+}: {
+  environments: Environment[];
+  editingId: string | null;
+  onSelectEditing: (id: string) => void;
+  onAdd: () => void;
+  onRename: (id: string, name: string) => void;
+  onDelete: (id: string) => void;
+  onUpdateVariable: (index: number, patch: Partial<KeyValuePair>) => void;
+  onRemoveVariable: (index: number) => void;
+}) {
+  const editing = environments.find((e) => e.id === editingId) ?? null;
+
+  return (
+    <div className="flex h-[75vh] gap-4">
+      <div className="flex w-64 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-1 pr-3">
+        {environments.map((env) => (
+          <div
+            key={env.id}
+            className={cn(
+              "group/env-row flex shrink-0 items-center rounded-md",
+              env.id === editingId && "bg-secondary"
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => onSelectEditing(env.id)}
+              className={cn(
+                "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm",
+                env.id === editingId ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {env.name}
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`${env.name} options`}
+                  className="mr-0.5 shrink-0 text-muted-foreground opacity-0 group-hover/env-row:opacity-100 data-[state=open]:opacity-100"
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem variant="destructive" onClick={() => onDelete(env.id)}>
+                  <Trash2 className="size-3.5" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onAdd}
+          className="mt-1 shrink-0 justify-start gap-1.5 text-muted-foreground"
+        >
+          <Plus className="size-3.5" />
+          New environment
+        </Button>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-1">
+        {editing ? (
+          <>
+            <Input
+              value={editing.name}
+              onChange={(e) => onRename(editing.id, e.target.value)}
+              className="w-auto min-w-32 max-w-full flex-none font-medium [field-sizing:content]"
+              aria-label="Environment name"
+            />
+            <KeyValueEditor
+              rows={editing.variables}
+              onUpdate={onUpdateVariable}
+              onRemove={onRemoveVariable}
+            />
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No environments yet. Create one to define variables like{" "}
+            <code className="font-mono">baseUrl</code>.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
   const [activeId, setActiveId] = useState(() => requests[0].id);
 
   const activeRequest = requests.find((r) => r.id === activeId)!;
+
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  // Which environment is active is a lightweight UI preference (not shared
+  // request data), so it lives in localStorage rather than round-tripping
+  // through Rust like the environments themselves.
+  const [activeEnvironmentId, setActiveEnvironmentId] = useState<string | null>(
+    () => localStorage.getItem("curlyq-active-environment-id")
+  );
+
+  // Restore saved environments, if any, on mount.
+  useEffect(() => {
+    invoke<Environment[]>("load_environments").then((saved) => {
+      if (saved.length > 0) setEnvironments(saved);
+    });
+  }, []);
+
+  // Debounced autosave, same pattern as tabs.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      invoke("save_environments", { environments });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [environments]);
+
+  useEffect(() => {
+    if (activeEnvironmentId === null) {
+      localStorage.removeItem("curlyq-active-environment-id");
+    } else {
+      localStorage.setItem("curlyq-active-environment-id", activeEnvironmentId);
+    }
+  }, [activeEnvironmentId]);
+
+  const activeEnvironment = environments.find((e) => e.id === activeEnvironmentId) ?? null;
+
+  // A drag-to-open sidebar (rather than a click toggle) for browsing many
+  // environments at once. Matches Postman's feel: a short pull past a small
+  // threshold snaps straight to the constant open width (not a continuous
+  // pixel-by-pixel resize), and pulling back the other way snaps it shut.
+  const [sidebarWidth, setSidebarWidth] = useState(0);
+
+  function handleSidebarHandlePointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const wasOpen = sidebarWidth > 0;
+    const openWidth = window.innerWidth * 0.16;
+    const threshold = 48;
+    let toggled = false;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      if (toggled) return;
+      const delta = moveEvent.clientX - startX;
+      if (!wasOpen && delta > threshold) {
+        setSidebarWidth(openWidth);
+        toggled = true;
+      } else if (wasOpen && delta < -threshold) {
+        setSidebarWidth(0);
+        toggled = true;
+      }
+    }
+    function handlePointerUp() {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+    }
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+  }
+
+  const [environmentEditorOpen, setEnvironmentEditorOpen] = useState(false);
+  const [editingEnvironmentId, setEditingEnvironmentId] = useState<string | null>(null);
+
+  function openEnvironmentEditor(id: string) {
+    setEditingEnvironmentId(id);
+    setEnvironmentEditorOpen(true);
+  }
+
+  function handleAddEnvironment() {
+    // Name is derived from `prev` inside the updater (not the `environments`
+    // closure) so rapid clicks queued before a re-render each still see the
+    // true current list instead of a stale one.
+    const id = crypto.randomUUID();
+    setEnvironments((prev) => [...prev, { ...createEnvironment(nextEnvironmentName(prev)), id }]);
+    setEditingEnvironmentId(id);
+  }
+
+  function handleRenameEnvironment(id: string, name: string) {
+    setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, name } : e)));
+  }
+
+  function handleDeleteEnvironment(id: string) {
+    const remaining = environments.filter((e) => e.id !== id);
+    setEnvironments(remaining);
+    if (activeEnvironmentId === id) setActiveEnvironmentId(null);
+    if (editingEnvironmentId === id) setEditingEnvironmentId(remaining[0]?.id ?? null);
+  }
+
+  function updateEnvironmentVariable(index: number, patch: Partial<KeyValuePair>) {
+    if (editingEnvironmentId === null) return;
+    setEnvironments((prev) =>
+      prev.map((e) =>
+        e.id === editingEnvironmentId ? { ...e, variables: updateRows(e.variables, index, patch) } : e
+      )
+    );
+  }
+
+  function removeEnvironmentVariable(index: number) {
+    if (editingEnvironmentId === null) return;
+    setEnvironments((prev) =>
+      prev.map((e) =>
+        e.id === editingEnvironmentId ? { ...e, variables: removeRow(e.variables, index) } : e
+      )
+    );
+  }
 
   // Restore tabs left open from the previous session, if any were saved.
   useEffect(() => {
@@ -373,20 +679,33 @@ function App() {
   }
 
   const isUrlEmpty = activeRequest.url.trim() === "";
-  const urlError = getUrlError(activeRequest.url);
+  const urlError = getUrlError(activeRequest.url, activeEnvironment);
   const bodyError = getBodyError(activeRequest.body);
   const canSend = !isUrlEmpty && !urlError;
+  const unresolvedVariables = getUnresolvedVariables(
+    [
+      activeRequest.url,
+      ...activeRequest.params.map((p) => p.value),
+      ...activeRequest.headers.map((h) => h.value),
+      activeRequest.body,
+    ],
+    activeEnvironment
+  );
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
     const { method, url, params, headers, body } = activeRequest;
-    const requestUrl = buildRequestUrl(url, params);
+    const requestUrl = buildRequestUrl(
+      substituteVariables(url, activeEnvironment),
+      params.map((p) => ({ ...p, value: substituteVariables(p.value, activeEnvironment) }))
+    );
     const requestHeaders = headers
       .filter(({ key, enabled }) => enabled && key.trim() !== "")
-      .map(({ key, value }) => [key, value] as [string, string]);
+      .map(({ key, value }) => [key, substituteVariables(value, activeEnvironment)] as [string, string]);
 
-    const trimmedBody = body.trim();
+    const substitutedBody = substituteVariables(body, activeEnvironment);
+    const trimmedBody = substitutedBody.trim();
     const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
     if (trimmedBody !== "" && !hasContentType) {
       requestHeaders.push(["Content-Type", "application/json"]);
@@ -398,7 +717,7 @@ function App() {
         method,
         url: requestUrl,
         headers: requestHeaders,
-        body: trimmedBody === "" ? null : body,
+        body: trimmedBody === "" ? null : substitutedBody,
       });
       updateActiveRequest({ response: result, isSending: false });
     } catch (err) {
@@ -407,7 +726,89 @@ function App() {
   }
 
   return (
-    <main className="flex flex-col gap-5 p-8">
+    <>
+      <div
+        className="fixed inset-y-0 left-0 z-30 overflow-hidden border-r bg-muted transition-[width] duration-150"
+        style={{ width: sidebarWidth }}
+      >
+        <div className="flex h-full w-[16vw] min-w-[180px] flex-col gap-1 p-3">
+          <Collapsible className="flex shrink-0 flex-col">
+            <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
+              Collections
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-3">
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">No collections yet.</p>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+            <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
+              Environments
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex min-h-0 flex-1 flex-col gap-1 pl-3">
+              <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+                {environments.map((env) => (
+                  <div
+                    key={env.id}
+                    className={cn(
+                      "group/sidebar-env flex shrink-0 items-center rounded-md",
+                      env.id === activeEnvironmentId && "bg-secondary"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setActiveEnvironmentId(env.id)}
+                      className={cn(
+                        "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm",
+                        env.id === activeEnvironmentId
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {env.name}
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => openEnvironmentEditor(env.id)}
+                      aria-label={`Edit ${env.name}`}
+                      className="mr-0.5 shrink-0 text-muted-foreground opacity-0 group-hover/sidebar-env:opacity-100"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleAddEnvironment}
+                className="shrink-0 justify-start gap-1.5 text-muted-foreground"
+              >
+                <Plus className="size-3.5" />
+                New environment
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
+
+      <div
+        onPointerDown={handleSidebarHandlePointerDown}
+        role="separator"
+        aria-label="Drag to open the environments sidebar"
+        className="fixed inset-y-0 z-40 w-1 cursor-ew-resize touch-none hover:bg-foreground/20"
+        style={{ left: sidebarWidth }}
+      />
+
+      <main
+        className="flex flex-col gap-5 p-8 transition-[margin-left] duration-150"
+        style={{ marginLeft: sidebarWidth }}
+      >
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-1.5">
           <div
@@ -460,7 +861,71 @@ function App() {
           >
             <Plus />
           </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="max-w-[9rem] shrink-0 gap-1.5 text-muted-foreground"
+              >
+                <Globe className="size-3.5 shrink-0" />
+                <span className="min-w-0 truncate">{activeEnvironment?.name ?? "No environment"}</span>
+                <ChevronDown className="size-3.5 shrink-0" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              // <main> has a fixed p-8 (2rem) padding and this trigger is the
+              // last element in its top row, so the trigger's right edge is
+              // always exactly `100vw - 2rem` — no DOM measurement needed to
+              // keep the menu's left edge from crossing the window's midpoint.
+              className="scrollbar-thin w-64 max-w-[calc(50vw-2rem)] max-h-[min(50vh,var(--radix-dropdown-menu-content-available-height))]"
+            >
+              <DropdownMenuRadioGroup
+                value={activeEnvironmentId ?? ""}
+                onValueChange={(value) => setActiveEnvironmentId(value === "" ? null : value)}
+              >
+                <DropdownMenuRadioItem value="">No environment</DropdownMenuRadioItem>
+                {environments.map((env) => (
+                  <DropdownMenuRadioItem key={env.id} value={env.id} className="group gap-2">
+                    <span className="min-w-0 flex-1 truncate">{env.name}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEnvironmentEditor(env.id);
+                      }}
+                      aria-label={`Edit ${env.name}`}
+                      className="shrink-0 rounded p-0.5 text-muted-foreground/70 opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100 group-data-[highlighted]:opacity-100"
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
+        <Dialog open={environmentEditorOpen} onOpenChange={setEnvironmentEditorOpen}>
+          <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw]">
+            <DialogHeader>
+              <DialogTitle>Environments</DialogTitle>
+            </DialogHeader>
+            <EnvironmentEditor
+              environments={environments}
+              editingId={editingEnvironmentId}
+              onSelectEditing={setEditingEnvironmentId}
+              onAdd={handleAddEnvironment}
+              onRename={handleRenameEnvironment}
+              onDelete={handleDeleteEnvironment}
+              onUpdateVariable={updateEnvironmentVariable}
+              onRemoveVariable={removeEnvironmentVariable}
+            />
+          </DialogContent>
+        </Dialog>
 
         <input
           type="text"
@@ -473,7 +938,7 @@ function App() {
           }}
           placeholder="Untitled request"
           aria-label="Request name"
-          className="-ml-2 w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="-ml-2 w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
         />
 
         <form className="flex flex-col gap-1.5" onSubmit={handleSend}>
@@ -506,6 +971,12 @@ function App() {
             </Button>
           </div>
           {urlError && <p className="text-sm text-destructive">{urlError}</p>}
+          {unresolvedVariables.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Unresolved variable{unresolvedVariables.length > 1 ? "s" : ""}:{" "}
+              {unresolvedVariables.map((name) => `{{${name}}}`).join(", ")}
+            </p>
+          )}
         </form>
 
         <div className="flex flex-col gap-2">
@@ -537,7 +1008,7 @@ function App() {
             {activeRequest.activeSubTab === "body" && (
               <div className="flex flex-col gap-1.5">
                 <textarea
-                  className="min-h-[180px] w-full resize-none rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:ring-2 aria-invalid:ring-destructive"
+                  className="min-h-[180px] w-full resize-none rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:ring-2 aria-invalid:ring-destructive"
                   placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
                   value={activeRequest.body}
                   onChange={(e) => updateActiveRequest({ body: e.target.value })}
@@ -602,6 +1073,7 @@ function App() {
         </Card>
       )}
     </main>
+    </>
   );
 }
 

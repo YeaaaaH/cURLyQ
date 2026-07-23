@@ -107,47 +107,22 @@ still-deferred collections feature). Instead:
 - A real "saved requests" / collections library (with an explicit save gesture) is a
   separate future feature, not this one.
 
-## Step 4: Environment variables
+## Step 4: Environment variables — DONE
 
-Also sequenced after Headers + Body, and benefits from Step 3's persistence plumbing
-(environments are saved the same way, via a new `environments.json`).
-
-- An "environment" is a named set of key/value variables (e.g. `baseUrl` →
-  `https://api.example.com`), substituted via `{{varName}}` syntax.
-- **Resolved**: multiple named environments (Dev/Staging/Prod-style), only one active
-  at a time — matches Postman's actual behavior (upload/define several environments,
-  switch which is active, e.g. `{{baseUrl}}` resolves differently per environment).
-  Not a single flat variable set.
-- Substitution point: a pure function `substituteVariables(text, activeEnvironment)`
-  applied to the URL, header values, and body right before `buildRequestUrl`/send —
-  not stored substituted, so the raw `{{varName}}` stays visible/editable in the UI.
-
-### Data model
-
-- `Environment { id, name, variables: KeyValuePair[] }` — reuses the existing
-  `KeyValuePair` shape, so enabling/disabling a variable works the same as it does for
-  Params/Headers.
-- App-level state (not per-tab, since environments are shared across all open tabs):
-  `environments: Environment[]` plus `activeEnvironmentId: string | null`.
-- Persisted the same way as tabs (Step 3's pattern): `environments.json` in
-  `app_data_dir()`, autosaved debounced on change, loaded on mount. New Rust commands
-  `save_environments`/`load_environments`, mirroring `save_tabs`/`load_tabs` exactly —
-  no other Rust changes needed, since substitution itself is pure frontend logic
-  applied before `invoke`.
-
-### UI
-
-- **Resolved**: a dedicated environment-editor view, closer to Postman's actual
-  layout, rather than a lightweight inline panel — a list of environments on one side
-  (create/rename/delete), the selected environment's variables (`KeyValuePair` rows,
-  same editor pattern as Params/Headers) on the other.
-- A separate, smaller dropdown near the tab bar shows the currently active
-  environment and lets the user switch it without opening the full editor — opening
-  the editor itself is a secondary action (e.g. a "Manage environments" entry in that
-  dropdown).
-- Non-blocking hint for unresolved variables at send time (e.g. `{{baseUrl}}` typed
-  but no `baseUrl` in the active environment, or no environment selected) — same
-  spirit as `getUrlError`/`getBodyError`, doesn't block Send, just surfaces the issue.
+- `Environment { id, name, variables: KeyValuePair[] }`, app-level `environments`
+  state (shared across tabs). `activeEnvironmentId` lives in localStorage rather
+  than Rust — a UI preference, not shared request data. Environments themselves
+  persist via `save_environments`/`load_environments`, mirroring `save_tabs`/`load_tabs`.
+- `substituteVariables` resolves `{{varName}}` against the active environment at
+  send time (URL, params, headers, body) without touching stored state, so the raw
+  template stays editable. New environments are auto-named from a world-capitals
+  list instead of "Environment N", deduped against names in use.
+- **Resolved**: full editor lives in a "Manage environments" `Dialog`; a dropdown
+  next to the tab bar switches the active one and opens the Dialog per-row via a
+  pencil icon; a drag-to-open left sidebar (Postman-style rail, "Collections"
+  placeholder + "Environments" list) gives a roomier view for many environments.
+- Along the way: fixed an app-wide focus-ring color, and a flexbox scroll/squish
+  bug that affects any `overflow-y-auto` list sized to a fixed height.
 
 ## Stretch: Copy as cURL
 
