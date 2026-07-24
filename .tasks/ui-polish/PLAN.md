@@ -44,16 +44,33 @@ just grew with content instead of scrolling in place.
   `rounded-lg border border-input`/`border-destructive` with `ring-0` to cancel the
   default ring, so all the stacked panels read as one consistent set.
 
-## Item 2: Tab + sub-tab active-state persistence — not started
+## Item 2: Tab + sub-tab active-state persistence — DONE
 
-`activeId` and each tab's `activeSubTab` are pure React state, never written to
-`tabs.json`. On restart, `fromPersistedTab` hardcodes `activeSubTab: "params"` and the
-restore effect hardcodes `setActiveId(restored[0].id)` — always the first tab, always
-Params. Fix: add `activeSubTab` to `PersistedTab` (TS + the mirrored Rust struct), and
-persist "last active tab id" as a sibling field alongside the tabs array (e.g. change
-`tabs.json`'s shape from a bare array to `{ activeTabId, tabs: [...] }`), updating
-`save_tabs`/`load_tabs` in `lib.rs` and call sites in `App.tsx` accordingly. Fall back to
-`restored[0].id` only if the saved id no longer exists.
+**Root cause**: `activeId` and each tab's `activeSubTab` were pure React state, never
+written to `tabs.json`. On restart, `fromPersistedTab` hardcoded `activeSubTab: "params"`
+and the restore effect hardcoded `setActiveId(restored[0].id)` — always the first tab,
+always Params.
+
+**Fix implemented**:
+- `PersistedTab` (TS `App.tsx` + mirrored Rust struct `lib.rs`) now includes
+  `activeSubTab`/`active_sub_tab` (Rust struct uses `#[serde(rename_all = "camelCase")]`
+  so the on-disk JSON key stays `activeSubTab`). `toPersistedTab`/`fromPersistedTab`
+  carry it through instead of hardcoding `"params"`.
+- `tabs.json`'s top-level shape changed from a bare array to
+  `{ activeTabId: string | null, tabs: PersistedTab[] }` (new `PersistedTabsFile` struct
+  in Rust, matching TS interface). `save_tabs`/`load_tabs` signatures updated
+  accordingly; the frontend's debounced save effect now depends on `[requests, activeId]`
+  and sends both. On restore, `activeTabId` is used if it still matches a restored tab,
+  otherwise falls back to `restored[0].id`.
+- **Migration handled and then removed**: since the user's existing `tabs.json` was in
+  the old bare-array shape, `load_tabs` briefly had a fallback that tried the new shape
+  first and fell back to parsing the old bare array (defaulting `activeTabId` to `null`
+  and `activeSubTab` to `"params"` via `#[serde(default = ...)]`) — a one-time, invisible
+  conversion, confirmed working by inspecting the on-disk file before/after. Once
+  confirmed, that fallback code and the `default_sub_tab()` helper were deleted; the
+  final code only parses the new shape, no lingering backwards-compat path.
+- Verified end-to-end in the running app: switched sub-tab on an open tab, relaunched,
+  confirmed the same tab and sub-tab were restored.
 
 ## Item 3: Environment-name input lag — not started
 

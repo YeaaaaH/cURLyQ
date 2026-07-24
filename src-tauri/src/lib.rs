@@ -25,6 +25,7 @@ struct Environment {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct PersistedTab {
     id: String,
     name: String,
@@ -33,6 +34,14 @@ struct PersistedTab {
     params: Vec<KeyValuePair>,
     headers: Vec<KeyValuePair>,
     body: String,
+    active_sub_tab: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedTabsFile {
+    active_tab_id: Option<String>,
+    tabs: Vec<PersistedTab>,
 }
 
 #[tauri::command]
@@ -81,17 +90,22 @@ fn tabs_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 }
 
 #[tauri::command]
-fn save_tabs(app: tauri::AppHandle, tabs: Vec<PersistedTab>) -> Result<(), String> {
+fn save_tabs(
+    app: tauri::AppHandle,
+    active_tab_id: Option<String>,
+    tabs: Vec<PersistedTab>,
+) -> Result<(), String> {
     let path = tabs_file_path(&app)?;
-    let json = serde_json::to_string_pretty(&tabs).map_err(|e| e.to_string())?;
+    let file = PersistedTabsFile { active_tab_id, tabs };
+    let json = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
     std::fs::write(path, json).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn load_tabs(app: tauri::AppHandle) -> Result<Vec<PersistedTab>, String> {
+fn load_tabs(app: tauri::AppHandle) -> Result<PersistedTabsFile, String> {
     let path = tabs_file_path(&app)?;
     if !path.exists() {
-        return Ok(vec![]);
+        return Ok(PersistedTabsFile { active_tab_id: None, tabs: vec![] });
     }
     let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     serde_json::from_str(&json).map_err(|e| e.to_string())

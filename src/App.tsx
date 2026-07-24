@@ -139,26 +139,33 @@ function createRequestTab(): RequestTab {
 }
 
 // The on-disk shape: everything in RequestTab except the transient,
-// never-persisted fields (activeSubTab, response, error, isSending).
+// never-persisted fields (response, error, isSending).
 interface PersistedTab {
   id: string;
   name: string;
   method: string;
   url: string;
+  activeSubTab: SubTab;
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
 }
 
+// tabs.json's top-level shape: which tab was last active is stored once here
+// (not per-tab), alongside the tab list itself.
+interface PersistedTabsFile {
+  activeTabId: string | null;
+  tabs: PersistedTab[];
+}
+
 function toPersistedTab(tab: RequestTab): PersistedTab {
-  const { id, name, method, url, params, headers, body } = tab;
-  return { id, name, method, url, params, headers, body };
+  const { id, name, method, url, activeSubTab, params, headers, body } = tab;
+  return { id, name, method, url, activeSubTab, params, headers, body };
 }
 
 function fromPersistedTab(saved: PersistedTab): RequestTab {
   return {
     ...saved,
-    activeSubTab: "params",
     response: null,
     error: null,
     isSending: false,
@@ -573,13 +580,17 @@ function App() {
     );
   }
 
-  // Restore tabs left open from the previous session, if any were saved.
+  // Restore tabs left open from the previous session, if any were saved,
+  // including which tab and which sub-tab were last active.
   useEffect(() => {
-    invoke<PersistedTab[]>("load_tabs").then((saved) => {
-      if (saved.length === 0) return;
-      const restored = saved.map(fromPersistedTab);
+    invoke<PersistedTabsFile>("load_tabs").then((saved) => {
+      if (saved.tabs.length === 0) return;
+      const restored = saved.tabs.map(fromPersistedTab);
       setRequests(restored);
-      setActiveId(restored[0].id);
+      const savedActiveId = restored.some((r) => r.id === saved.activeTabId)
+        ? saved.activeTabId!
+        : restored[0].id;
+      setActiveId(savedActiveId);
     });
   }, []);
 
@@ -587,10 +598,10 @@ function App() {
   // burst of keystrokes doesn't trigger a write per character.
   useEffect(() => {
     const timeout = setTimeout(() => {
-      invoke("save_tabs", { tabs: requests.map(toPersistedTab) });
+      invoke("save_tabs", { activeTabId: activeId, tabs: requests.map(toPersistedTab) });
     }, 500);
     return () => clearTimeout(timeout);
-  }, [requests]);
+  }, [requests, activeId]);
 
   function updateActiveRequest(patch: Partial<RequestTab>) {
     setRequests((prev) => prev.map((r) => (r.id === activeId ? { ...r, ...patch } : r)));
