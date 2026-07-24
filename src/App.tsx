@@ -806,10 +806,10 @@ function App() {
       />
 
       <main
-        className="flex flex-col gap-5 p-8 transition-[margin-left] duration-150"
+        className="flex h-screen flex-col gap-5 overflow-hidden p-8 transition-[margin-left] duration-150"
         style={{ marginLeft: sidebarWidth }}
       >
-      <div className="flex flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-3">
         <div className="flex items-center gap-1.5">
           <div
             className="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto"
@@ -979,99 +979,99 @@ function App() {
           )}
         </form>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex w-fit gap-1 rounded-lg bg-secondary p-1">
-            {SUB_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => updateActiveRequest({ activeSubTab: tab.id })}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  activeRequest.activeSubTab === tab.id
-                    ? "border border-input bg-background text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="min-h-[220px] rounded-lg border border-input p-3 text-sm text-muted-foreground">
-            {activeRequest.activeSubTab === "params" && (
-              <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
-            )}
-            {activeRequest.activeSubTab === "headers" && (
-              <KeyValueEditor rows={activeRequest.headers} onUpdate={updateHeader} onRemove={removeHeader} />
-            )}
-            {activeRequest.activeSubTab === "body" && (
-              <div className="flex flex-col gap-1.5">
-                <textarea
-                  className="min-h-[180px] w-full resize-none rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:ring-2 aria-invalid:ring-destructive"
-                  placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
-                  value={activeRequest.body}
-                  onChange={(e) => updateActiveRequest({ body: e.target.value })}
-                  onKeyDown={handleBodyKeyDown}
-                  onMouseDown={(e) => {
-                    if (e.detail < 3) return;
-                    e.preventDefault();
-                    e.currentTarget.select();
-                  }}
-                  aria-invalid={bodyError !== null}
-                  spellCheck={false}
-                />
-                {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
-              </div>
-            )}
-          </div>
+        <div className="flex w-fit shrink-0 gap-1 rounded-lg bg-secondary p-1">
+          {SUB_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => updateActiveRequest({ activeSubTab: tab.id })}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                activeRequest.activeSubTab === tab.id
+                  ? "border border-input bg-background text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {activeRequest.error && (
-        <Card className="border-destructive">
-          <CardContent>
-            <p className="mb-2 font-semibold text-destructive">Error</p>
-            <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words font-mono text-sm text-destructive">
-              {activeRequest.error}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeRequest.response && (
-        <Card className="gap-0 py-0">
-          <div className="flex items-center border-b px-4 py-3">
-            <Badge
-              variant={statusVariant(activeRequest.response.status)}
-              className="font-mono text-sm"
-            >
-              {activeRequest.response.status}
-            </Badge>
-          </div>
-
-          {Object.keys(activeRequest.response.headers).length > 0 && (
-            <Collapsible className="border-b">
-              <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-                Headers ({Object.keys(activeRequest.response.headers).length})
-                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="max-h-[200px] overflow-auto px-4 pb-2 font-mono text-sm">
-                {Object.entries(activeRequest.response.headers).map(([name, value]) => (
-                  <div className="flex gap-2 py-0.5" key={name}>
-                    <span className="text-muted-foreground">{name}</span>
-                    <span className="break-all">{value}</span>
-                  </div>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
+        <div className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto rounded-lg border border-input p-3 text-sm text-muted-foreground">
+          {activeRequest.activeSubTab === "params" && (
+            <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
           )}
+          {activeRequest.activeSubTab === "headers" && (
+            <KeyValueEditor rows={activeRequest.headers} onUpdate={updateHeader} onRemove={removeHeader} />
+          )}
+          {activeRequest.activeSubTab === "body" && (
+            <div className="flex h-full min-h-0 flex-col gap-1.5">
+              <textarea
+                className="scrollbar-thin min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:ring-2 aria-invalid:ring-destructive"
+                placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
+                value={activeRequest.body}
+                onChange={(e) => updateActiveRequest({ body: e.target.value })}
+                onKeyDown={handleBodyKeyDown}
+                onMouseDown={(e) => {
+                  if (e.detail < 3) return;
+                  e.preventDefault();
+                  e.currentTarget.select();
+                }}
+                aria-invalid={bodyError !== null}
+                spellCheck={false}
+              />
+              {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
+            </div>
+          )}
+        </div>
 
-          <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-sm">
-            {formatBody(activeRequest.response.body)}
-          </pre>
-        </Card>
-      )}
+        {activeRequest.error && (
+          <Card className="shrink-0 rounded-lg border border-destructive ring-0">
+            <CardContent>
+              <p className="mb-2 font-semibold text-destructive">Error</p>
+              <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words font-mono text-sm text-destructive">
+                {activeRequest.error}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeRequest.response && (
+          <Card className="shrink-0 gap-0 rounded-lg border border-input py-0 ring-0">
+            <div className="flex items-center border-b px-4 py-3">
+              <Badge
+                variant={statusVariant(activeRequest.response.status)}
+                className="font-mono text-sm"
+              >
+                {activeRequest.response.status}
+              </Badge>
+            </div>
+
+            {Object.keys(activeRequest.response.headers).length > 0 && (
+              <Collapsible className="border-b">
+                <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  Headers ({Object.keys(activeRequest.response.headers).length})
+                  <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="scrollbar-thin max-h-[200px] overflow-auto px-4 pb-2 font-mono text-sm">
+                  {Object.entries(activeRequest.response.headers).map(([name, value]) => (
+                    <div className="flex gap-2 py-0.5" key={name}>
+                      <span className="text-muted-foreground">{name}</span>
+                      <span className="break-all">{value}</span>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            <pre className="scrollbar-thin max-h-[480px] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-sm">
+              {formatBody(activeRequest.response.body)}
+            </pre>
+          </Card>
+        )}
+      </div>
     </main>
     </>
   );
