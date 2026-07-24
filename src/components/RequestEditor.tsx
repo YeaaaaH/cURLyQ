@@ -14,6 +14,7 @@ import { SUB_TABS, type RequestTab } from "@/lib/requestTabs";
 export function RequestEditor({
   activeRequest,
   onUpdate,
+  onCommitName,
   onUrlChange,
   onSend,
   canSend,
@@ -22,6 +23,7 @@ export function RequestEditor({
 }: {
   activeRequest: RequestTab;
   onUpdate: (patch: Partial<RequestTab>) => void;
+  onCommitName: () => void;
   onUrlChange: (rawUrl: string) => void;
   onSend: (e: React.FormEvent) => void;
   canSend: boolean;
@@ -34,14 +36,10 @@ export function RequestEditor({
         type="text"
         value={activeRequest.name}
         onChange={(e) => onUpdate({ name: e.target.value })}
-        onBlur={() => {
-          if (activeRequest.name.trim() === "") {
-            onUpdate({ name: "Untitled request" });
-          }
-        }}
+        onBlur={onCommitName}
         placeholder="Untitled request"
         aria-label="Request name"
-        className="-ml-2 w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
       />
 
       <form className="flex flex-col gap-1.5" onSubmit={onSend}>

@@ -15,6 +15,21 @@ import {
   substituteVariables,
 } from "@/lib/environments";
 import { buildRequestUrl, parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
+import {
+  type Collection,
+  type RequestNode,
+  addNodeToCollection,
+  collectRequestIds,
+  createCollection,
+  createFolderNode,
+  createRequestNode,
+  deleteCollection,
+  deleteCollectionNode,
+  findCollectionNode,
+  moveNodeRelativeToTarget,
+  renameCollection,
+  renameCollectionNode,
+} from "@/lib/collections";
 import type { HttpResponse } from "@/lib/http";
 import {
   type PersistedTabsFile,
@@ -28,8 +43,8 @@ import {
 import { Sidebar } from "@/components/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import { RequestEditor } from "@/components/RequestEditor";
-import { RequestPanel } from "@/components/RequestPanel";
-import { ResponseViewer } from "@/components/ResponseViewer";
+import { RequestVariablesTabs } from "@/components/RequestVariablesTabs";
+import { ResponseContainer } from "@/components/ResponseContainer";
 
 function App() {
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
@@ -77,6 +92,127 @@ function App() {
   }, [activeEnvironmentId]);
 
   const activeEnvironment = environments.find((e) => e.id === activeEnvironmentId) ?? null;
+
+  const [collections, setCollections] = useState<Collection[]>([]);
+
+  // Restore saved collections, if any, on mount.
+  useEffect(() => {
+    invoke<Collection[]>("load_collections").then((saved) => {
+      if (saved.length > 0) setCollections(saved);
+    });
+  }, []);
+
+  // Debounced autosave, same pattern as environments/tabs.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      invoke("save_collections", { collections });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [collections]);
+
+  function handleAddCollection(): string {
+    const collection = createCollection("New Collection");
+    setCollections((prev) => [...prev, collection]);
+    return collection.id;
+  }
+
+  function handleRenameCollection(id: string, name: string) {
+    setCollections((prev) => renameCollection(prev, id, name));
+  }
+
+  function handleDeleteCollection(id: string) {
+    const collection = collections.find((c) => c.id === id);
+    setCollections((prev) => deleteCollection(prev, id));
+    if (collection) {
+      closeTabsForRequestIds(new Set(collection.items.flatMap(collectRequestIds)));
+    }
+  }
+
+  function handleAddFolder(collectionId: string, parentFolderId: string | null): string {
+    const folder = createFolderNode("New Folder");
+    setCollections((prev) => addNodeToCollection(prev, collectionId, parentFolderId, folder));
+    return folder.id;
+  }
+
+  // Creating a request always opens it in a new tab immediately, since the
+  // tree row alone has nowhere to edit method/URL/params — same reasoning as
+  // why folders (which have nothing to "open") stay in tree-inline-rename
+  // instead.
+  function handleAddRequestNode(collectionId: string, parentFolderId: string | null): string {
+    const node = createRequestNode("New Request");
+    setCollections((prev) => addNodeToCollection(prev, collectionId, parentFolderId, node));
+    openCollectionRequestTab(collectionId, node);
+    return node.id;
+  }
+
+  function handleRenameCollectionNode(collectionId: string, nodeId: string, name: string) {
+    setCollections((prev) => renameCollectionNode(prev, collectionId, nodeId, name));
+  }
+
+  function handleDeleteCollectionNode(collectionId: string, nodeId: string) {
+    const node = findCollectionNode(collections, collectionId, nodeId);
+    setCollections((prev) => deleteCollectionNode(prev, collectionId, nodeId));
+    if (node) {
+      closeTabsForRequestIds(new Set(collectRequestIds(node)));
+    }
+  }
+
+  // Closes every open tab whose sourceRequestId is in `deletedIds` (a request
+  // being deleted directly, or every request that was nested inside a deleted
+  // folder/collection) — an open tab shouldn't keep pointing at a request that
+  // no longer exists. Falls back to a fresh blank tab if that closes the last
+  // one, or to the first remaining tab if the active tab specifically was
+  // among those closed.
+  function closeTabsForRequestIds(deletedIds: Set<string>) {
+    if (deletedIds.size === 0) return;
+    const remaining = requests.filter((r) => !r.sourceRequestId || !deletedIds.has(r.sourceRequestId));
+    if (remaining.length === requests.length) return;
+    if (remaining.length === 0) {
+      const fresh = createRequestTab();
+      setRequests([fresh]);
+      setActiveId(fresh.id);
+      return;
+    }
+    setRequests(remaining);
+    if (!remaining.some((r) => r.id === activeId)) {
+      setActiveId(remaining[0].id);
+    }
+  }
+
+  function handleMoveCollectionNode(draggedId: string, targetId: string) {
+    setCollections((prev) => moveNodeRelativeToTarget(prev, draggedId, targetId));
+  }
+
+  function openCollectionRequestTab(collectionId: string, node: RequestNode) {
+    const tab: RequestTab = {
+      id: crypto.randomUUID(),
+      name: node.name,
+      method: node.method,
+      url: node.url,
+      activeSubTab: "params",
+      params: ensureTrailingBlankRow(node.params),
+      headers: ensureTrailingBlankRow(node.headers),
+      body: node.body,
+      response: null,
+      error: null,
+      isSending: false,
+      sourceRequestId: node.id,
+      sourceCollectionId: collectionId,
+    };
+    setRequests((prev) => [...prev, tab]);
+    setActiveId(tab.id);
+  }
+
+  // Opening the same saved request twice focuses the existing tab instead of
+  // piling up duplicates.
+  function handleOpenCollectionRequest(collectionId: string, node: RequestNode) {
+    const existingTab = requests.find((r) => r.sourceRequestId === node.id);
+    if (existingTab) {
+      setActiveId(existingTab.id);
+      return;
+    }
+    openCollectionRequestTab(collectionId, node);
+  }
 
   // A drag-to-open sidebar (rather than a click toggle) for browsing many
   // environments at once. Matches Postman's feel: a short pull past a small
@@ -188,6 +324,21 @@ function App() {
 
   function updateActiveRequest(patch: Partial<RequestTab>) {
     setRequests((prev) => prev.map((r) => (r.id === activeId ? { ...r, ...patch } : r)));
+  }
+
+  // Renaming a tab that was opened from (or saved to) a collection request
+  // keeps the two names in sync — deliberately only on blur (not every
+  // keystroke) so typing a name doesn't re-render the whole collection tree
+  // per character, the same lag bug fixed for environment renaming (see
+  // ui-polish PLAN.md Item 3).
+  function handleCommitRequestName() {
+    const finalName = activeRequest.name.trim() === "" ? "Untitled request" : activeRequest.name;
+    updateActiveRequest({ name: finalName });
+    if (activeRequest.sourceRequestId && activeRequest.sourceCollectionId) {
+      setCollections((prev) =>
+        renameCollectionNode(prev, activeRequest.sourceCollectionId!, activeRequest.sourceRequestId!, finalName)
+      );
+    }
   }
 
   function handleAddTab() {
@@ -352,6 +503,16 @@ function App() {
         onSelectEnvironment={setActiveEnvironmentId}
         onEditEnvironment={openEnvironmentEditor}
         onAddEnvironment={handleAddEnvironment}
+        collections={collections}
+        onAddCollection={handleAddCollection}
+        onRenameCollection={handleRenameCollection}
+        onDeleteCollection={handleDeleteCollection}
+        onOpenCollectionRequest={handleOpenCollectionRequest}
+        onAddFolder={handleAddFolder}
+        onAddRequestNode={handleAddRequestNode}
+        onRenameCollectionNode={handleRenameCollectionNode}
+        onDeleteCollectionNode={handleDeleteCollectionNode}
+        onMoveCollectionNode={handleMoveCollectionNode}
       />
 
       <main
@@ -384,6 +545,7 @@ function App() {
         <RequestEditor
           activeRequest={activeRequest}
           onUpdate={updateActiveRequest}
+          onCommitName={handleCommitRequestName}
           onUrlChange={handleUrlChange}
           onSend={handleSend}
           canSend={canSend}
@@ -392,8 +554,8 @@ function App() {
         />
       </div>
 
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
-        <RequestPanel
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
+        <RequestVariablesTabs
           activeRequest={activeRequest}
           onUpdate={updateActiveRequest}
           updateParam={updateParam}
@@ -404,7 +566,7 @@ function App() {
           bodyError={bodyError}
         />
 
-        <ResponseViewer error={activeRequest.error} response={activeRequest.response} />
+        <ResponseContainer error={activeRequest.error} response={activeRequest.response} />
       </div>
     </main>
     </>

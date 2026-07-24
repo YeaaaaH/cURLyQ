@@ -35,6 +35,12 @@ struct PersistedTab {
     headers: Vec<KeyValuePair>,
     body: String,
     active_sub_tab: String,
+    // Absent in tabs.json files saved before Collections existed —
+    // `#[serde(default)]` reads those as None instead of failing to parse.
+    #[serde(default)]
+    source_request_id: Option<String>,
+    #[serde(default)]
+    source_collection_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,6 +48,35 @@ struct PersistedTab {
 struct PersistedTabsFile {
     active_tab_id: Option<String>,
     tabs: Vec<PersistedTab>,
+}
+
+// Mirrors the frontend's CollectionNode discriminated union: `type` tags which
+// variant a node is, so a folder can contain more folders or requests nested
+// arbitrarily deep.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum CollectionNode {
+    Folder {
+        id: String,
+        name: String,
+        items: Vec<CollectionNode>,
+    },
+    Request {
+        id: String,
+        name: String,
+        method: String,
+        url: String,
+        params: Vec<KeyValuePair>,
+        headers: Vec<KeyValuePair>,
+        body: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Collection {
+    id: String,
+    name: String,
+    items: Vec<CollectionNode>,
 }
 
 #[tauri::command]
@@ -134,6 +169,79 @@ fn load_environments(app: tauri::AppHandle) -> Result<Vec<Environment>, String> 
     serde_json::from_str(&json).map_err(|e| e.to_string())
 }
 
+#[cfg(test)]
+mod collection_node_tests {
+    use super::*;
+
+    // The frontend's CollectionNode is a discriminated union on a `type`
+    // field with literal "folder"/"request" tags. This pins down that the
+    // `#[serde(tag = "type", rename_all = "lowercase")]` attribute actually
+    // produces that exact shape, since a mismatch here wouldn't be caught by
+    // the compiler on either side of the IPC boundary.
+    #[test]
+    fn serializes_with_lowercase_type_tag() {
+        let folder = CollectionNode::Folder {
+            id: "f1".into(),
+            name: "My Folder".into(),
+            items: vec![CollectionNode::Request {
+                id: "r1".into(),
+                name: "Get users".into(),
+                method: "GET".into(),
+                url: "https://example.com".into(),
+                params: vec![],
+                headers: vec![],
+                body: String::new(),
+            }],
+        };
+
+        let json = serde_json::to_value(&folder).unwrap();
+        assert_eq!(json["type"], "folder");
+        assert_eq!(json["items"][0]["type"], "request");
+        assert_eq!(json["items"][0]["method"], "GET");
+    }
+
+    #[test]
+    fn round_trips_through_json() {
+        let original = Collection {
+            id: "c1".into(),
+            name: "My Collection".into(),
+            items: vec![CollectionNode::Folder {
+                id: "f1".into(),
+                name: "Nested".into(),
+                items: vec![],
+            }],
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: Collection = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.id, original.id);
+        assert_eq!(parsed.items.len(), 1);
+    }
+}
+
+fn collections_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("collections.json"))
+}
+
+#[tauri::command]
+fn save_collections(app: tauri::AppHandle, collections: Vec<Collection>) -> Result<(), String> {
+    let path = collections_file_path(&app)?;
+    let json = serde_json::to_string_pretty(&collections).map_err(|e| e.to_string())?;
+    std::fs::write(path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_collections(app: tauri::AppHandle) -> Result<Vec<Collection>, String> {
+    let path = collections_file_path(&app)?;
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&json).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -143,7 +251,9 @@ pub fn run() {
             save_tabs,
             load_tabs,
             save_environments,
-            load_environments
+            load_environments,
+            save_collections,
+            load_collections
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

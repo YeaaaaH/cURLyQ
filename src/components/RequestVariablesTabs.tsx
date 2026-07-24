@@ -1,8 +1,9 @@
+import { Card } from "@/components/ui/card";
 import type { KeyValuePair } from "@/lib/keyValue";
 import type { RequestTab } from "@/lib/requestTabs";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 
-export function RequestPanel({
+export function RequestVariablesTabs({
   activeRequest,
   onUpdate,
   updateParam,
@@ -22,7 +23,7 @@ export function RequestPanel({
   bodyError: string | null;
 }) {
   return (
-    <div className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto rounded-lg border border-input p-3 text-sm text-muted-foreground">
+    <Card className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto rounded-lg border border-input p-3 text-sm text-muted-foreground ring-0">
       {activeRequest.activeSubTab === "params" && (
         <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
       )}
@@ -32,7 +33,7 @@ export function RequestPanel({
       {activeRequest.activeSubTab === "body" && (
         <div className="flex h-full min-h-0 flex-col gap-1.5">
           <textarea
-            className="scrollbar-thin min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:ring-2 aria-invalid:ring-destructive"
+            className="scrollbar-thin min-h-0 w-full flex-1 resize-none overflow-y-auto font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 aria-invalid:ring-2 aria-invalid:ring-destructive"
             placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
             value={activeRequest.body}
             onChange={(e) => onUpdate({ body: e.target.value })}
@@ -43,11 +44,13 @@ export function RequestPanel({
               e.currentTarget.select();
             }}
             aria-invalid={bodyError !== null}
+            autoComplete="off"
+            autoCorrect="off"
             spellCheck={false}
           />
           {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

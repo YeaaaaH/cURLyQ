@@ -22,6 +22,12 @@ export interface RequestTab {
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
+  // Set when this tab was opened from (or last saved to) a request node in a
+  // Collection — lets "Save" update that node in place instead of always
+  // opening a "Save to..." picker. Both null for a tab that was never linked
+  // to a collection.
+  sourceRequestId: string | null;
+  sourceCollectionId: string | null;
 }
 
 export function createRequestTab(): RequestTab {
@@ -37,6 +43,8 @@ export function createRequestTab(): RequestTab {
     response: null,
     error: null,
     isSending: false,
+    sourceRequestId: null,
+    sourceCollectionId: null,
   };
 }
 
@@ -51,6 +59,8 @@ export interface PersistedTab {
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
+  sourceRequestId: string | null;
+  sourceCollectionId: string | null;
 }
 
 // tabs.json's top-level shape: which tab was last active is stored once here
@@ -61,7 +71,7 @@ export interface PersistedTabsFile {
 }
 
 export function toPersistedTab(tab: RequestTab): PersistedTab {
-  const { id, name, method, url, activeSubTab, params, headers, body } = tab;
+  const { id, name, method, url, activeSubTab, params, headers, body, sourceRequestId, sourceCollectionId } = tab;
   return {
     id,
     name,
@@ -71,6 +81,8 @@ export function toPersistedTab(tab: RequestTab): PersistedTab {
     params: stripEmptyRows(params),
     headers: stripEmptyRows(headers),
     body,
+    sourceRequestId,
+    sourceCollectionId,
   };
 }
 

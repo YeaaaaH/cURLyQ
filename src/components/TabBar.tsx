@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -63,6 +64,18 @@ export function TabBar({
 }) {
   const activeEnvironment = environments.find((e) => e.id === activeEnvironmentId) ?? null;
 
+  // The tab strip scrolls horizontally once there are more tabs than fit —
+  // switching the active tab programmatically (e.g. clicking a request in
+  // the collection tree that's already open) previously left it selected but
+  // scrolled out of view, with no indication anything changed. `block:
+  // "nearest"`/`inline: "nearest"` keeps this to the strip's own horizontal
+  // scroll, since <main>'s ancestors are all overflow-hidden/fixed and can't
+  // scroll anyway.
+  const tabRefs = useRef(new Map<string, HTMLDivElement>());
+  useEffect(() => {
+    tabRefs.current.get(activeId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeId]);
+
   return (
     <>
       <div className="flex items-center gap-1.5">
@@ -73,6 +86,10 @@ export function TabBar({
           {requests.map((tab) => (
             <div
               key={tab.id}
+              ref={(el) => {
+                if (el) tabRefs.current.set(tab.id, el);
+                else tabRefs.current.delete(tab.id);
+              }}
               role="button"
               tabIndex={0}
               onClick={() => onSelectTab(tab.id)}
