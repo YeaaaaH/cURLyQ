@@ -72,31 +72,64 @@ always Params.
 - Verified end-to-end in the running app: switched sub-tab on an open tab, relaunched,
   confirmed the same tab and sub-tab were restored.
 
-## Item 3: Environment-name input lag — not started
+## Item 3: Environment-name input lag — DONE
 
-Not a persistence problem — `save_environments` is already debounced 500ms. The lag is
-a full-tree re-render on every keystroke: zero memoization anywhere in `App.tsx`, so
-each keystroke re-renders the sidebar env list, the environment dropdown, every
-`KeyValueEditor` row, and re-runs regex scans (`getUnresolvedVariables` etc.). Fix:
-memoize with `React.memo`/`useMemo` at the actual hot spots instead of adding an
-artificial debounce to the input itself (that would make typing feel laggy on purpose).
+**Root cause**: not a persistence problem (`save_environments` was already debounced
+500ms) — it was a full-tree re-render on every keystroke, since renaming updated the
+top-level `environments` state directly on every `onChange`, cascading into the sidebar
+env list, the environment dropdown, and every `KeyValueEditor` row in the editor.
 
-## Item 4: Params tab doesn't sync when deleting a templated URL param — not started
+**Fix implemented**:
+- First pass (general memoization): wrapped `KeyValueEditor` in `React.memo`; converted
+  `updateParam`/`removeParam`/`updateHeader`/`removeHeader` and
+  `updateEnvironmentVariable`/`removeEnvironmentVariable` to `useCallback` with stable
+  functional `setRequests`/`setEnvironments` updates (keyed on `activeId` /
+  `editingEnvironmentId` respectively, not on the request/environment data itself) so
+  their identities don't change on unrelated edits; wrapped `urlError`/`bodyError`/
+  `unresolvedVariables` in `useMemo`.
+- Still felt laggy after that, because renaming itself updates the shared `environments`
+  array on every keystroke — the sidebar and dropdown legitimately re-render every
+  character since they display the live name. **Root fix**: replaced the environment
+  name `Input` with a new `EnvironmentNameField` component that holds the typed value in
+  **local** component state (`useState`) and only calls `onRename` (touching shared
+  state) when the user clicks a confirm (✓) button or presses Enter. `key={editing.id}`
+  on the field resets the draft when switching which environment is being edited. Typing
+  no longer touches app-wide state at all, so it can't cascade into any other component.
+- Verified in the running app: typing a long name now feels smooth.
 
-`handleUrlChange` uses `new URL(rawUrl)`, which throws whenever the base/host is
-templated (e.g. `{{baseUrl}}/search?q={{someEnvVar}}`) — confirmed via direct test.
-The `catch` branch then updates only `url`, leaving `params` stale from then on.
-`buildDisplayUrl` (the reverse direction) already works around this with plain string
-splicing and has a comment explaining why; `handleUrlChange` needs the same treatment.
+## Item 4: Params tab doesn't sync when deleting a templated URL param — DONE
 
-## Item 5: environments.json persists an empty dummy variable — not started
+**Root cause**: `handleUrlChange` used `new URL(rawUrl)`, which throws whenever the
+base/host is templated (e.g. `{{baseUrl}}/search?q={{someEnvVar}}`) — confirmed via
+direct test. The `catch` branch then updated only `url`, leaving `params` stale from
+then on. `buildDisplayUrl` (the reverse direction) already worked around this with plain
+string splicing and had a comment explaining why; `handleUrlChange` needed the same
+treatment.
 
-Not a save-path bug — the growing-row UI (`createEnvironment`, `updateRows`) always
-keeps one trailing empty row to type into, and that row is part of the same array
-persisted verbatim. Fix: filter out fully-empty rows (`key === "" && value === ""`)
-at the persistence boundary only (debounced save effects), keeping the live UI's
-trailing blank row untouched. Check whether `tabs.json`'s `params`/`headers` have the
-same latent issue (same growing-row pattern) while in there.
+**Fix implemented**: added `parseParamsFromUrl` (plain string splicing — split on `#`,
+then `?`, then `&`/`=`, mirroring `buildDisplayUrl`/`escapeForDisplay`'s approach exactly
+via a new `unescapeFromDisplay` helper) and swapped it in for the `new URL()` parsing in
+`handleUrlChange`. Works for template URLs in both directions now.
+
+## Item 5: environments.json persists an empty dummy variable — DONE
+
+**Root cause**: not a save-path bug — the growing-row UI (`createEnvironment`,
+`updateRows`) always keeps one trailing empty row to type into, and that row was part of
+the same array persisted verbatim (no filtering anywhere before the `invoke` calls).
+
+**Fix implemented**:
+- New `stripEmptyRows` helper (filters rows where both `key` and `value` are blank),
+  applied at the persistence boundary only: inside `toPersistedTab` (for `tabs.json`'s
+  `params`/`headers` — same latent issue existed there too) and in the `save_environments`
+  debounced effect (for each environment's `variables`).
+- New `ensureTrailingBlankRow` helper (inverse — adds a blank row back if the last row is
+  filled in or the list is empty), applied on load (`fromPersistedTab`, and the
+  `load_environments` effect) to restore the self-growing-row invariant live UI state
+  expects, since a stripped/loaded row list may have zero rows or end in a filled one.
+- Verified against the real `environments.json`: new environments now save as
+  `"variables": []` instead of a dummy `{ id, key: "", value: "" }` entry. Also used this
+  pass to clear ~95 leftover test environments that had accumulated in the file from
+  earlier manual testing, down to the two real ones (`dev-ac`, `test-env`).
 
 ## Item 6: environments.json / tabs.json persistence mechanism — analysis, closed
 

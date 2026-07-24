@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Globe, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Globe, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -160,12 +160,23 @@ interface PersistedTabsFile {
 
 function toPersistedTab(tab: RequestTab): PersistedTab {
   const { id, name, method, url, activeSubTab, params, headers, body } = tab;
-  return { id, name, method, url, activeSubTab, params, headers, body };
+  return {
+    id,
+    name,
+    method,
+    url,
+    activeSubTab,
+    params: stripEmptyRows(params),
+    headers: stripEmptyRows(headers),
+    body,
+  };
 }
 
 function fromPersistedTab(saved: PersistedTab): RequestTab {
   return {
     ...saved,
+    params: ensureTrailingBlankRow(saved.params),
+    headers: ensureTrailingBlankRow(saved.headers),
     response: null,
     error: null,
     isSending: false,
@@ -282,6 +293,36 @@ function syncUrlWithParams(rawUrl: string, params: KeyValuePair[]): string {
   return buildDisplayUrl(rawUrl, params);
 }
 
+function unescapeFromDisplay(value: string): string {
+  return value.replace(/%23|%26|%3d/gi, (seq) => decodeURIComponent(seq));
+}
+
+// Reverse of buildDisplayUrl — also plain string splicing rather than the URL
+// API, so typing/pasting a template URL like {{baseUrl}}/path?x=1 (which
+// isn't parseable as an absolute URL) still keeps the Params tab in sync.
+function parseParamsFromUrl(rawUrl: string): KeyValuePair[] {
+  const hashIndex = rawUrl.indexOf("#");
+  const withoutHash = hashIndex === -1 ? rawUrl : rawUrl.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  if (queryIndex === -1) return [];
+  const query = withoutHash.slice(queryIndex + 1);
+  if (query === "") return [];
+  return query
+    .split("&")
+    .map((pair) => {
+      const eqIndex = pair.indexOf("=");
+      const key = eqIndex === -1 ? pair : pair.slice(0, eqIndex);
+      const value = eqIndex === -1 ? "" : pair.slice(eqIndex + 1);
+      return {
+        id: crypto.randomUUID(),
+        key: unescapeFromDisplay(key),
+        value: unescapeFromDisplay(value),
+        enabled: true,
+      };
+    })
+    .filter(({ key, value }) => key !== "" || value !== "");
+}
+
 // Shared self-growing-row logic for Params/Headers: always keeps exactly one
 // trailing empty row in state so there's a stable place to type a new entry.
 function updateRows(
@@ -304,7 +345,26 @@ function removeRow(rows: KeyValuePair[], index: number): KeyValuePair[] {
     : [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }];
 }
 
-function KeyValueEditor({
+// The self-growing-row pattern always keeps a blank trailing row in live UI
+// state so there's somewhere to type a new entry — but that row shouldn't be
+// written to disk until it actually has a key or value.
+function stripEmptyRows(rows: KeyValuePair[]): KeyValuePair[] {
+  return rows.filter(({ key, value }) => key.trim() !== "" || value.trim() !== "");
+}
+
+// Reverse of stripEmptyRows, applied after loading persisted rows — restores
+// the invariant the self-growing-row pattern expects (a blank row to type
+// into), since a saved row list may have none (fully stripped) or end in a
+// filled-in row.
+function ensureTrailingBlankRow(rows: KeyValuePair[]): KeyValuePair[] {
+  const last = rows[rows.length - 1];
+  if (!last || last.key.trim() !== "" || last.value.trim() !== "") {
+    return [...rows, { id: crypto.randomUUID(), key: "", value: "", enabled: true }];
+  }
+  return rows;
+}
+
+const KeyValueEditor = memo(function KeyValueEditor({
   rows,
   onUpdate,
   onRemove,
@@ -357,6 +417,56 @@ function KeyValueEditor({
           </div>
         );
       })}
+    </div>
+  );
+});
+
+// Local draft state, only committed to the shared `environments` state on
+// explicit confirm (click or Enter) — typing here never touches the
+// app-wide state, so it can't cascade a re-render into the sidebar,
+// environment dropdown, or the rest of this editor on every keystroke.
+// `key={id}` on the call site (not shown here) resets the draft whenever the
+// user switches which environment they're editing.
+function EnvironmentNameField({
+  name,
+  onConfirm,
+}: {
+  name: string;
+  onConfirm: (name: string) => void;
+}) {
+  const [draft, setDraft] = useState(name);
+  const trimmed = draft.trim();
+  const isDirty = trimmed !== "" && trimmed !== name;
+
+  function commit() {
+    if (isDirty) onConfirm(trimmed);
+    else setDraft(name);
+  }
+
+  return (
+    <div className="flex flex-none items-center gap-1.5">
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+        }}
+        className="w-auto min-w-32 max-w-full font-medium [field-sizing:content]"
+        aria-label="Environment name"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        onClick={commit}
+        disabled={!isDirty}
+        aria-label="Confirm name change"
+      >
+        <Check className="size-3.5" />
+      </Button>
     </div>
   );
 }
@@ -439,11 +549,10 @@ function EnvironmentEditor({
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-1">
         {editing ? (
           <>
-            <Input
-              value={editing.name}
-              onChange={(e) => onRename(editing.id, e.target.value)}
-              className="w-auto min-w-32 max-w-full flex-none font-medium [field-sizing:content]"
-              aria-label="Environment name"
+            <EnvironmentNameField
+              key={editing.id}
+              name={editing.name}
+              onConfirm={(name) => onRename(editing.id, name)}
             />
             <KeyValueEditor
               rows={editing.variables}
@@ -479,14 +588,22 @@ function App() {
   // Restore saved environments, if any, on mount.
   useEffect(() => {
     invoke<Environment[]>("load_environments").then((saved) => {
-      if (saved.length > 0) setEnvironments(saved);
+      if (saved.length > 0) {
+        setEnvironments(
+          saved.map((e) => ({ ...e, variables: ensureTrailingBlankRow(e.variables) }))
+        );
+      }
     });
   }, []);
 
-  // Debounced autosave, same pattern as tabs.
+  // Debounced autosave, same pattern as tabs. Strips the always-present blank
+  // trailing variable row so environments.json doesn't accumulate an
+  // empty-key/empty-value entry per environment.
   useEffect(() => {
     const timeout = setTimeout(() => {
-      invoke("save_environments", { environments });
+      invoke("save_environments", {
+        environments: environments.map((e) => ({ ...e, variables: stripEmptyRows(e.variables) })),
+      });
     }, 500);
     return () => clearTimeout(timeout);
   }, [environments]);
@@ -562,23 +679,29 @@ function App() {
     if (editingEnvironmentId === id) setEditingEnvironmentId(remaining[0]?.id ?? null);
   }
 
-  function updateEnvironmentVariable(index: number, patch: Partial<KeyValuePair>) {
-    if (editingEnvironmentId === null) return;
-    setEnvironments((prev) =>
-      prev.map((e) =>
-        e.id === editingEnvironmentId ? { ...e, variables: updateRows(e.variables, index, patch) } : e
-      )
-    );
-  }
+  const updateEnvironmentVariable = useCallback(
+    (index: number, patch: Partial<KeyValuePair>) => {
+      if (editingEnvironmentId === null) return;
+      setEnvironments((prev) =>
+        prev.map((e) =>
+          e.id === editingEnvironmentId ? { ...e, variables: updateRows(e.variables, index, patch) } : e
+        )
+      );
+    },
+    [editingEnvironmentId]
+  );
 
-  function removeEnvironmentVariable(index: number) {
-    if (editingEnvironmentId === null) return;
-    setEnvironments((prev) =>
-      prev.map((e) =>
-        e.id === editingEnvironmentId ? { ...e, variables: removeRow(e.variables, index) } : e
-      )
-    );
-  }
+  const removeEnvironmentVariable = useCallback(
+    (index: number) => {
+      if (editingEnvironmentId === null) return;
+      setEnvironments((prev) =>
+        prev.map((e) =>
+          e.id === editingEnvironmentId ? { ...e, variables: removeRow(e.variables, index) } : e
+        )
+      );
+    },
+    [editingEnvironmentId]
+  );
 
   // Restore tabs left open from the previous session, if any were saved,
   // including which tab and which sub-tab were last active.
@@ -636,23 +759,49 @@ function App() {
     e.currentTarget.scrollLeft += e.deltaY;
   }
 
-  function updateParam(index: number, patch: Partial<KeyValuePair>) {
-    const params = updateRows(activeRequest.params, index, patch);
-    updateActiveRequest({ params, url: syncUrlWithParams(activeRequest.url, params) });
-  }
+  const updateParam = useCallback(
+    (index: number, patch: Partial<KeyValuePair>) => {
+      setRequests((prev) =>
+        prev.map((r) => {
+          if (r.id !== activeId) return r;
+          const params = updateRows(r.params, index, patch);
+          return { ...r, params, url: syncUrlWithParams(r.url, params) };
+        })
+      );
+    },
+    [activeId]
+  );
 
-  function removeParam(index: number) {
-    const params = removeRow(activeRequest.params, index);
-    updateActiveRequest({ params, url: syncUrlWithParams(activeRequest.url, params) });
-  }
+  const removeParam = useCallback(
+    (index: number) => {
+      setRequests((prev) =>
+        prev.map((r) => {
+          if (r.id !== activeId) return r;
+          const params = removeRow(r.params, index);
+          return { ...r, params, url: syncUrlWithParams(r.url, params) };
+        })
+      );
+    },
+    [activeId]
+  );
 
-  function updateHeader(index: number, patch: Partial<KeyValuePair>) {
-    updateActiveRequest({ headers: updateRows(activeRequest.headers, index, patch) });
-  }
+  const updateHeader = useCallback(
+    (index: number, patch: Partial<KeyValuePair>) => {
+      setRequests((prev) =>
+        prev.map((r) => (r.id === activeId ? { ...r, headers: updateRows(r.headers, index, patch) } : r))
+      );
+    },
+    [activeId]
+  );
 
-  function removeHeader(index: number) {
-    updateActiveRequest({ headers: removeRow(activeRequest.headers, index) });
-  }
+  const removeHeader = useCallback(
+    (index: number) => {
+      setRequests((prev) =>
+        prev.map((r) => (r.id === activeId ? { ...r, headers: removeRow(r.headers, index) } : r))
+      );
+    },
+    [activeId]
+  );
 
   function handleBodyKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Tab") return;
@@ -674,33 +823,30 @@ function App() {
       });
       return;
     }
-    try {
-      const parsed = new URL(rawUrl);
-      const params: KeyValuePair[] = [...parsed.searchParams.entries()].map(([key, value]) => ({
-        id: crypto.randomUUID(),
-        key,
-        value,
-        enabled: true,
-      }));
-      params.push({ id: crypto.randomUUID(), key: "", value: "", enabled: true });
-      updateActiveRequest({ url: rawUrl, params });
-    } catch {
-      updateActiveRequest({ url: rawUrl });
-    }
+    const params = parseParamsFromUrl(rawUrl);
+    params.push({ id: crypto.randomUUID(), key: "", value: "", enabled: true });
+    updateActiveRequest({ url: rawUrl, params });
   }
 
   const isUrlEmpty = activeRequest.url.trim() === "";
-  const urlError = getUrlError(activeRequest.url, activeEnvironment);
-  const bodyError = getBodyError(activeRequest.body);
+  const urlError = useMemo(
+    () => getUrlError(activeRequest.url, activeEnvironment),
+    [activeRequest.url, activeEnvironment]
+  );
+  const bodyError = useMemo(() => getBodyError(activeRequest.body), [activeRequest.body]);
   const canSend = !isUrlEmpty && !urlError;
-  const unresolvedVariables = getUnresolvedVariables(
-    [
-      activeRequest.url,
-      ...activeRequest.params.map((p) => p.value),
-      ...activeRequest.headers.map((h) => h.value),
-      activeRequest.body,
-    ],
-    activeEnvironment
+  const unresolvedVariables = useMemo(
+    () =>
+      getUnresolvedVariables(
+        [
+          activeRequest.url,
+          ...activeRequest.params.map((p) => p.value),
+          ...activeRequest.headers.map((h) => h.value),
+          activeRequest.body,
+        ],
+        activeEnvironment
+      ),
+    [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body, activeEnvironment]
   );
 
   async function handleSend(e: React.FormEvent) {
