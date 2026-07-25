@@ -43,6 +43,17 @@ drag-and-drop) are done — see `.tasks/done/collections.md`. Remaining work: St
 - "Save as" (secondary action) always opens the picker, even for tabs with a source —
   lets you fork a copy.
 
+**Method live-sync — DONE (2026-07-25).** Found while testing: a source-linked
+tab's method changes weren't propagating back to the collection at all — only the
+*name* had that. Resolved by extending the same one-directional live-sync pattern
+to method: `updateCollectionRequestMethod` (`src/lib/collections.ts`, mirrors
+`renameCollectionNode`) + `handleUpdateMethod` (`App.tsx`), wired to the method
+`<Select>`'s `onValueChange` in `RequestEditor.tsx`. No blur-debounce needed here
+(unlike the name) — a `<Select>` pick is already one discrete event, not a
+keystroke stream, so there's no per-character re-render risk to guard against.
+url/headers/body/params still don't sync anywhere — still waiting on the real
+Save gesture above.
+
 ### Explicitly deferred (unless scope changes)
 
 - Import/export (Postman collection JSON format compatibility).

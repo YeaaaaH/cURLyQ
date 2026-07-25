@@ -170,6 +170,25 @@ export function renameCollectionNode(
   );
 }
 
+// Live-syncs a source-linked tab's method back into the collection, the same
+// way renameCollectionNode already does for the name — no explicit Save
+// gesture yet (that's Step B3), so this is the same narrow "sync this one
+// field immediately" shortcut, just for method instead of name. Guarded to
+// request nodes only (a no-op on a folder, which has no method) since
+// mapItems' callback signature can't express that statically.
+export function updateCollectionRequestMethod(
+  collections: Collection[],
+  collectionId: string,
+  nodeId: string,
+  method: string
+): Collection[] {
+  return collections.map((c) =>
+    c.id === collectionId
+      ? { ...c, items: mapItems(c.items, nodeId, (n) => (n.type === "request" ? { ...n, method } : n)) }
+      : c
+  );
+}
+
 export function deleteCollectionNode(
   collections: Collection[],
   collectionId: string,

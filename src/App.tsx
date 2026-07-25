@@ -49,6 +49,7 @@ import {
   parsePostmanCollection,
   renameCollection,
   renameCollectionNode,
+  updateCollectionRequestMethod,
 } from "@/lib/collections";
 import type { HttpResponse } from "@/lib/http";
 import {
@@ -563,6 +564,18 @@ function App() {
     }
   }
 
+  // Same live-sync shortcut as the name above, for method — a Select's
+  // onValueChange is already a single discrete pick (not a keystroke stream),
+  // so there's no lag risk here that would call for a blur-only debounce.
+  function handleUpdateMethod(method: string) {
+    updateActiveRequest({ method });
+    if (activeRequest.sourceRequestId && activeRequest.sourceCollectionId) {
+      setCollections((prev) =>
+        updateCollectionRequestMethod(prev, activeRequest.sourceCollectionId!, activeRequest.sourceRequestId!, method)
+      );
+    }
+  }
+
   function handleAddTab() {
     const tab = createRequestTab();
     setRequests((prev) => [...prev, tab]);
@@ -801,6 +814,7 @@ function App() {
           activeRequest={activeRequest}
           onUpdate={updateActiveRequest}
           onCommitName={handleCommitRequestName}
+          onUpdateMethod={handleUpdateMethod}
           onUrlChange={handleUrlChange}
           onSend={handleSend}
           canSend={canSend}

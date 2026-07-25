@@ -15,6 +15,7 @@ export function RequestEditor({
   activeRequest,
   onUpdate,
   onCommitName,
+  onUpdateMethod,
   onUrlChange,
   onSend,
   canSend,
@@ -24,6 +25,7 @@ export function RequestEditor({
   activeRequest: RequestTab;
   onUpdate: (patch: Partial<RequestTab>) => void;
   onCommitName: () => void;
+  onUpdateMethod: (method: string) => void;
   onUrlChange: (rawUrl: string) => void;
   onSend: (e: React.FormEvent) => void;
   canSend: boolean;
@@ -46,7 +48,7 @@ export function RequestEditor({
         <div className="flex gap-2">
           <Select
             value={activeRequest.method}
-            onValueChange={(method) => onUpdate({ method })}
+            onValueChange={onUpdateMethod}
           >
             <SelectTrigger className="w-28 font-semibold">
               <SelectValue />
