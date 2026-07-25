@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Check, Download, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
@@ -70,6 +70,7 @@ export function EnvironmentEditor({
   onAdd,
   onRename,
   onDelete,
+  onExport,
   onUpdateVariable,
   onRemoveVariable,
 }: {
@@ -79,6 +80,7 @@ export function EnvironmentEditor({
   onAdd: () => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onExport: (id: string) => void;
   onUpdateVariable: (index: number, patch: Partial<KeyValuePair>) => void;
   onRemoveVariable: (index: number) => void;
 }) {
@@ -118,6 +120,10 @@ export function EnvironmentEditor({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => onExport(env.id)}>
+                  <Download className="size-3.5" />
+                  Export...
+                </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => onDelete(env.id)}>
                   <Trash2 className="size-3.5" />
                   Delete

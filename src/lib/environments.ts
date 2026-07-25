@@ -1,4 +1,4 @@
-import type { KeyValuePair } from "@/lib/keyValue";
+import { type KeyValuePair, ensureTrailingBlankRow, stripEmptyRows } from "@/lib/keyValue";
 
 export interface Environment {
   id: string;
@@ -75,4 +75,79 @@ export function getUnresolvedVariables(texts: string[], environment: Environment
     }
   }
   return [...unresolved];
+}
+
+// Reverse of parsePostmanEnvironment below — the exported file only needs to
+// be re-importable (by us or real Postman), not byte-identical to whatever
+// was originally imported, so this doesn't try to round-trip an `id` or any
+// `_postman_*` metadata we never kept in the first place.
+export function buildPostmanEnvironment(environment: Environment) {
+  return {
+    id: environment.id,
+    name: environment.name,
+    values: stripEmptyRows(environment.variables).map(({ key, value, enabled }) => ({
+      key,
+      value,
+      type: "default",
+      enabled,
+    })),
+    _postman_variable_scope: "environment",
+    _postman_exported_at: new Date().toISOString(),
+  };
+}
+
+export class PostmanImportError extends Error {}
+
+interface PostmanEnvironmentValue {
+  key?: unknown;
+  value?: unknown;
+  enabled?: unknown;
+}
+
+// Keeps the imported name recognizable ("Dev", "Dev (2)", ...) instead of
+// nextEnvironmentName's capital-city scheme, which is only for brand-new,
+// user-has-no-opinion-yet environments — an imported file already has a name
+// the user picked, we just need to keep it unique.
+function dedupeName(name: string, existingNames: Set<string>): string {
+  if (!existingNames.has(name)) return name;
+  for (let i = 2; ; i++) {
+    const candidate = `${name} (${i})`;
+    if (!existingNames.has(candidate)) return candidate;
+  }
+}
+
+// Maps a parsed Postman v2.1 environment export into our Environment shape.
+// Throws PostmanImportError (with a user-facing message) if `json` doesn't
+// look like a Postman environment at all.
+export function parsePostmanEnvironment(json: unknown, existing: Environment[]): Environment {
+  if (typeof json !== "object" || json === null) {
+    throw new PostmanImportError("Not a valid JSON file.");
+  }
+  const data = json as Record<string, unknown>;
+
+  if (Array.isArray(data.item)) {
+    throw new PostmanImportError(
+      "This looks like a Postman collection, not an environment — collection import isn't supported yet."
+    );
+  }
+  if (!Array.isArray(data.values)) {
+    throw new PostmanImportError('Missing a "values" array — not a Postman environment file.');
+  }
+
+  const variables: KeyValuePair[] = data.values
+    .filter((v): v is PostmanEnvironmentValue => typeof v === "object" && v !== null && typeof v.key === "string")
+    .map((v) => ({
+      id: crypto.randomUUID(),
+      key: v.key as string,
+      value: typeof v.value === "string" ? v.value : "",
+      enabled: v.enabled !== false,
+    }));
+
+  const rawName = typeof data.name === "string" && data.name.trim() !== "" ? data.name.trim() : "Imported environment";
+
+  return {
+    id: crypto.randomUUID(),
+    name: dedupeName(rawName, new Set(existing.map((e) => e.name))),
+    variables: ensureTrailingBlankRow(stripEmptyRows(variables)),
+  };
 }

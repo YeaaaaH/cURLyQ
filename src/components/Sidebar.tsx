@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -6,15 +7,37 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, FolderPlus, Globe, Pencil, Plus, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Download,
+  FolderPlus,
+  Globe,
+  History,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  XCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
 import type { Collection, RequestNode } from "@/lib/collections";
+import { type ImportExportLogEntry, formatRelativeTime } from "@/lib/importExportLog";
 import { CollectionTree } from "@/components/CollectionTree";
 
 export function Sidebar({
@@ -25,6 +48,10 @@ export function Sidebar({
   onSelectEnvironment,
   onEditEnvironment,
   onAddEnvironment,
+  onImportEnvironment,
+  onExportEnvironment,
+  onDeleteEnvironment,
+  importExportLog,
   collections,
   onAddCollection,
   onRenameCollection,
@@ -43,6 +70,10 @@ export function Sidebar({
   onSelectEnvironment: (id: string) => void;
   onEditEnvironment: (id: string) => void;
   onAddEnvironment: () => void;
+  onImportEnvironment: () => void;
+  onExportEnvironment: (id: string) => void;
+  onDeleteEnvironment: (id: string) => void;
+  importExportLog: ImportExportLogEntry[];
   collections: Collection[];
   onAddCollection: () => string;
   onRenameCollection: (id: string, name: string) => void;
@@ -54,6 +85,8 @@ export function Sidebar({
   onDeleteCollectionNode: (collectionId: string, nodeId: string) => void;
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
 }) {
+  const [detailEntry, setDetailEntry] = useState<ImportExportLogEntry | null>(null);
+
   return (
     <>
       <div
@@ -83,11 +116,15 @@ export function Sidebar({
                   <Globe className="size-3.5" />
                   Environment
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={onImportEnvironment}>
+                  <Upload className="size-3.5" />
+                  Import environment...
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+          <Collapsible defaultOpen className="flex min-h-0 max-h-[50%] shrink flex-col">
             <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
               <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
               Collections
@@ -138,17 +175,131 @@ export function Sidebar({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
+                      onClick={() => onExportEnvironment(env.id)}
+                      aria-label={`Export ${env.name}`}
+                      className="shrink-0 text-muted-foreground opacity-0 group-hover/sidebar-env:opacity-100"
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => onEditEnvironment(env.id)}
                       aria-label={`Edit ${env.name}`}
-                      className="mr-0.5 shrink-0 text-muted-foreground opacity-0 group-hover/sidebar-env:opacity-100"
+                      className="shrink-0 text-muted-foreground opacity-0 group-hover/sidebar-env:opacity-100"
                     >
                       <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => onDeleteEnvironment(env.id)}
+                      aria-label={`Delete ${env.name}`}
+                      className="mr-0.5 shrink-0 text-muted-foreground opacity-0 hover:text-destructive group-hover/sidebar-env:opacity-100"
+                    >
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 ))}
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 w-full shrink-0 justify-start gap-2 px-2 text-muted-foreground hover:text-foreground"
+              >
+                <History className="size-3.5" />
+                Import/Export Log
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" className="w-80 p-2">
+              {importExportLog.length === 0 ? (
+                <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No imports or exports yet.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-0.5">
+                  {importExportLog.map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => setDetailEntry(entry)}
+                      className="flex items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent"
+                    >
+                      {entry.status === "success" ? (
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                      ) : (
+                        <XCircle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">
+                          {entry.status === "error"
+                            ? `${entry.direction === "import" ? "Import" : "Export"} failed: ${entry.label}`
+                            : `${entry.direction === "import" ? "Imported" : "Exported"} "${entry.label}"${
+                                entry.variableCount !== undefined
+                                  ? ` (${entry.variableCount} variables)`
+                                  : ""
+                              }`}
+                        </p>
+                        {entry.message && (
+                          <p className="truncate text-xs text-destructive">{entry.message}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {formatRelativeTime(entry.timestamp)}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          <Dialog open={detailEntry !== null} onOpenChange={(open) => !open && setDetailEntry(null)}>
+            <DialogContent>
+              {detailEntry && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {detailEntry.direction === "import" ? "Import" : "Export"}{" "}
+                      {detailEntry.status === "success" ? "succeeded" : "failed"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {new Date(detailEntry.timestamp).toLocaleString()}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">
+                        {detailEntry.status === "error" ? "File: " : "Environment: "}
+                      </span>
+                      {detailEntry.label}
+                    </div>
+                    {detailEntry.variableCount !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">Variables: </span>
+                        {detailEntry.variableCount}
+                      </div>
+                    )}
+                    {detailEntry.message && (
+                      <div>
+                        <span className="text-muted-foreground">Error:</span>
+                        <p className="mt-1 rounded-md bg-muted p-2 font-mono text-xs break-words whitespace-pre-wrap select-text">
+                          {detailEntry.message}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

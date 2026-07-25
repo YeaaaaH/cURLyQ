@@ -39,6 +39,7 @@ export function TabBar({
   onAddEnvironment,
   onRenameEnvironment,
   onDeleteEnvironment,
+  onExportEnvironment,
   onUpdateEnvironmentVariable,
   onRemoveEnvironmentVariable,
 }: {
@@ -59,6 +60,7 @@ export function TabBar({
   onAddEnvironment: () => void;
   onRenameEnvironment: (id: string, name: string) => void;
   onDeleteEnvironment: (id: string) => void;
+  onExportEnvironment: (id: string) => void;
   onUpdateEnvironmentVariable: (index: number, patch: Partial<KeyValuePair>) => void;
   onRemoveEnvironmentVariable: (index: number) => void;
 }) {
@@ -193,6 +195,7 @@ export function TabBar({
             onAdd={onAddEnvironment}
             onRename={onRenameEnvironment}
             onDelete={onDeleteEnvironment}
+            onExport={onExportEnvironment}
             onUpdateVariable={onUpdateEnvironmentVariable}
             onRemoveVariable={onRemoveEnvironmentVariable}
           />

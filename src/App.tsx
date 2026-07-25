@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   type KeyValuePair,
   ensureTrailingBlankRow,
@@ -9,12 +22,16 @@ import {
 } from "@/lib/keyValue";
 import {
   type Environment,
+  PostmanImportError,
+  buildPostmanEnvironment,
   createEnvironment,
   getUnresolvedVariables,
   nextEnvironmentName,
+  parsePostmanEnvironment,
   substituteVariables,
 } from "@/lib/environments";
 import { buildRequestUrl, parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
+import { type ImportExportLogEntry, pushLogEntry } from "@/lib/importExportLog";
 import {
   type Collection,
   type RequestNode,
@@ -249,6 +266,7 @@ function App() {
 
   const [environmentEditorOpen, setEnvironmentEditorOpen] = useState(false);
   const [editingEnvironmentId, setEditingEnvironmentId] = useState<string | null>(null);
+  const [importExportLog, setImportExportLog] = useState<ImportExportLogEntry[]>([]);
 
   function openEnvironmentEditor(id: string) {
     setEditingEnvironmentId(id);
@@ -268,11 +286,105 @@ function App() {
     setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, name } : e)));
   }
 
+  async function handleImportEnvironment() {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!path) return;
+    const fileName = path.split(/[\\/]/).pop() ?? path;
+
+    try {
+      const raw = await invoke<string>("read_text_file", { path });
+      const environment = parsePostmanEnvironment(JSON.parse(raw), environments);
+      setEnvironments((prev) => [...prev, environment]);
+      setEditingEnvironmentId(environment.id);
+      setEnvironmentEditorOpen(true);
+      const variableCount = environment.variables.filter((v) => v.key.trim() !== "").length;
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "import",
+          label: environment.name,
+          variableCount,
+          status: "success",
+        })
+      );
+      toast.success(`Imported "${environment.name}"`, {
+        description: `${variableCount} variable${variableCount === 1 ? "" : "s"}`,
+      });
+    } catch (err) {
+      const message = err instanceof PostmanImportError ? err.message : String(err);
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, { direction: "import", label: fileName, status: "error", message })
+      );
+      toast.error(`Couldn't import "${fileName}"`, { description: message });
+    }
+  }
+
+  async function handleExportEnvironment(id: string) {
+    const environment = environments.find((e) => e.id === id);
+    if (!environment) return;
+
+    const path = await save({
+      defaultPath: `${environment.name}.postman_environment.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!path) return;
+
+    const variableCount = environment.variables.filter((v) => v.key.trim() !== "").length;
+    try {
+      const json = JSON.stringify(buildPostmanEnvironment(environment), null, 2);
+      await invoke("write_text_file", { path, contents: json });
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "export",
+          label: environment.name,
+          variableCount,
+          status: "success",
+        })
+      );
+      toast.success(`Exported "${environment.name}"`, {
+        description: `${variableCount} variable${variableCount === 1 ? "" : "s"}`,
+      });
+    } catch (err) {
+      const message = String(err);
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, { direction: "export", label: environment.name, status: "error", message })
+      );
+      toast.error(`Couldn't export "${environment.name}"`, { description: message });
+    }
+  }
+
   function handleDeleteEnvironment(id: string) {
     const remaining = environments.filter((e) => e.id !== id);
     setEnvironments(remaining);
     if (activeEnvironmentId === id) setActiveEnvironmentId(null);
     if (editingEnvironmentId === id) setEditingEnvironmentId(remaining[0]?.id ?? null);
+  }
+
+  // Only environments that actually have variables get a confirmation —
+  // deleting an empty one is low-risk and stays instant, matching the same
+  // rule collections already use for folders/collections.
+  const [pendingDeleteEnvironment, setPendingDeleteEnvironment] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  function requestDeleteEnvironment(id: string) {
+    const environment = environments.find((e) => e.id === id);
+    const variableCount = environment?.variables.filter((v) => v.key.trim() !== "").length ?? 0;
+    if (environment && variableCount > 0) {
+      setPendingDeleteEnvironment({
+        title: `Delete "${environment.name}"?`,
+        description: `This environment has ${variableCount} variable${
+          variableCount === 1 ? "" : "s"
+        }. Deleting it can't be undone.`,
+        onConfirm: () => handleDeleteEnvironment(id),
+      });
+      return;
+    }
+    handleDeleteEnvironment(id);
   }
 
   const updateEnvironmentVariable = useCallback(
@@ -495,6 +607,29 @@ function App() {
 
   return (
     <>
+      <Toaster position="bottom-right" richColors />
+      <AlertDialog
+        open={pendingDeleteEnvironment !== null}
+        onOpenChange={(open) => !open && setPendingDeleteEnvironment(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingDeleteEnvironment?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{pendingDeleteEnvironment?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                pendingDeleteEnvironment?.onConfirm();
+                setPendingDeleteEnvironment(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Sidebar
         sidebarWidth={sidebarWidth}
         onHandlePointerDown={handleSidebarHandlePointerDown}
@@ -503,6 +638,10 @@ function App() {
         onSelectEnvironment={setActiveEnvironmentId}
         onEditEnvironment={openEnvironmentEditor}
         onAddEnvironment={handleAddEnvironment}
+        onImportEnvironment={handleImportEnvironment}
+        onExportEnvironment={handleExportEnvironment}
+        onDeleteEnvironment={requestDeleteEnvironment}
+        importExportLog={importExportLog}
         collections={collections}
         onAddCollection={handleAddCollection}
         onRenameCollection={handleRenameCollection}
@@ -537,7 +676,8 @@ function App() {
           onSelectEditingEnvironment={setEditingEnvironmentId}
           onAddEnvironment={handleAddEnvironment}
           onRenameEnvironment={handleRenameEnvironment}
-          onDeleteEnvironment={handleDeleteEnvironment}
+          onDeleteEnvironment={requestDeleteEnvironment}
+          onExportEnvironment={handleExportEnvironment}
           onUpdateEnvironmentVariable={updateEnvironmentVariable}
           onRemoveEnvironmentVariable={removeEnvironmentVariable}
         />

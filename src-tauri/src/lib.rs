@@ -242,10 +242,25 @@ fn load_collections(app: tauri::AppHandle) -> Result<Vec<Collection>, String> {
     serde_json::from_str(&json).map_err(|e| e.to_string())
 }
 
+// Reads an arbitrary file the user picked via the native open dialog (import
+// flow) — unlike the app-data-dir helpers above, `path` isn't ours to choose,
+// it comes straight from the OS file picker the user just interacted with.
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+// Writes to a path the user chose via the native save dialog (export flow).
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(path, contents).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             send_request,
             save_tabs,
@@ -253,7 +268,9 @@ pub fn run() {
             save_environments,
             load_environments,
             save_collections,
-            load_collections
+            load_collections,
+            read_text_file,
+            write_text_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, Folder, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Folder, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { METHOD_COLORS } from "@/lib/http";
 import {
@@ -161,7 +161,10 @@ function NodeMenu({
             New request
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
+        <DropdownMenuItem onClick={onRename}>
+          <Pencil className="size-3.5" />
+          Rename
+        </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 className="size-3.5" />
           Delete
