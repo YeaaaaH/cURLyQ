@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,6 +54,8 @@ export function Sidebar({
   importExportLog,
   collections,
   onAddCollection,
+  onImportCollection,
+  onExportCollection,
   onRenameCollection,
   onDeleteCollection,
   onOpenCollectionRequest,
@@ -76,6 +78,8 @@ export function Sidebar({
   importExportLog: ImportExportLogEntry[];
   collections: Collection[];
   onAddCollection: () => string;
+  onImportCollection: () => void;
+  onExportCollection: (id: string) => void;
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
   onOpenCollectionRequest: (collectionId: string, node: RequestNode) => void;
@@ -86,6 +90,37 @@ export function Sidebar({
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
 }) {
   const [detailEntry, setDetailEntry] = useState<ImportExportLogEntry | null>(null);
+
+  // Collections/Environments split — null means "use the default (content-sized,
+  // capped at 50%)" behavior; once dragged, a fixed pixel height takes over.
+  const collectionsWrapperRef = useRef<HTMLDivElement>(null);
+  const [collectionsHeight, setCollectionsHeight] = useState<number | null>(null);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+
+  function handleSplitPointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    const wrapper = collectionsWrapperRef.current;
+    if (!wrapper) return;
+    const startY = e.clientY;
+    const startHeight = wrapper.getBoundingClientRect().height;
+    const containerHeight = wrapper.parentElement?.getBoundingClientRect().height ?? startHeight * 2;
+    const minHeight = 60;
+    const maxHeight = Math.max(minHeight, containerHeight * 0.8);
+
+    setIsDraggingSplit(true);
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const next = Math.min(maxHeight, Math.max(minHeight, startHeight + (moveEvent.clientY - startY)));
+      setCollectionsHeight(next);
+    }
+    function handlePointerUp() {
+      setIsDraggingSplit(false);
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+    }
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+  }
 
   return (
     <>
@@ -120,29 +155,60 @@ export function Sidebar({
                   <Upload className="size-3.5" />
                   Import environment...
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={onImportCollection}>
+                  <Upload className="size-3.5" />
+                  Import collection...
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          <Collapsible defaultOpen className="flex min-h-0 max-h-[50%] shrink flex-col">
-            <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
-              <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
-              Collections
-            </CollapsibleTrigger>
-            <CollapsibleContent className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pl-3">
-              <CollectionTree
-                collections={collections}
-                onRenameCollection={onRenameCollection}
-                onDeleteCollection={onDeleteCollection}
-                onOpenRequest={onOpenCollectionRequest}
-                onAddFolder={onAddFolder}
-                onAddRequest={onAddRequestNode}
-                onRenameNode={onRenameCollectionNode}
-                onDeleteNode={onDeleteCollectionNode}
-                onMoveNode={onMoveCollectionNode}
-              />
-            </CollapsibleContent>
-          </Collapsible>
+          <div
+            ref={collectionsWrapperRef}
+            className="flex min-h-0 max-h-[50%] shrink flex-col"
+            style={
+              collectionsHeight !== null
+                ? { height: collectionsHeight, maxHeight: collectionsHeight, flexShrink: 0 }
+                : undefined
+            }
+          >
+            <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+              <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+                <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
+                Collections
+              </CollapsibleTrigger>
+              <CollapsibleContent className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pl-3">
+                <CollectionTree
+                  collections={collections}
+                  onRenameCollection={onRenameCollection}
+                  onDeleteCollection={onDeleteCollection}
+                  onExportCollection={onExportCollection}
+                  onOpenRequest={onOpenCollectionRequest}
+                  onAddFolder={onAddFolder}
+                  onAddRequest={onAddRequestNode}
+                  onRenameNode={onRenameCollectionNode}
+                  onDeleteNode={onDeleteCollectionNode}
+                  onMoveNode={onMoveCollectionNode}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          <div
+            onPointerDown={handleSplitPointerDown}
+            role="separator"
+            aria-label="Drag to resize Collections/Environments"
+            className="group/split-handle shrink-0 cursor-ns-resize touch-none py-1"
+          >
+            <div
+              className={cn(
+                "border-t-2 transition-[height]",
+                isDraggingSplit
+                  ? "h-2 border-foreground/40"
+                  : "h-0.5 border-transparent group-hover/split-handle:border-foreground/20"
+              )}
+            />
+          </div>
 
           <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
             <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
@@ -242,9 +308,7 @@ export function Sidebar({
                           {entry.status === "error"
                             ? `${entry.direction === "import" ? "Import" : "Export"} failed: ${entry.label}`
                             : `${entry.direction === "import" ? "Imported" : "Exported"} "${entry.label}"${
-                                entry.variableCount !== undefined
-                                  ? ` (${entry.variableCount} variables)`
-                                  : ""
+                                entry.detail ? ` (${entry.detail})` : ""
                               }`}
                         </p>
                         {entry.message && (
@@ -277,14 +341,20 @@ export function Sidebar({
                   <div className="flex flex-col gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">
-                        {detailEntry.status === "error" ? "File: " : "Environment: "}
+                        {detailEntry.status === "error"
+                          ? "File: "
+                          : detailEntry.kind === "environment"
+                            ? "Environment: "
+                            : "Collection: "}
                       </span>
                       {detailEntry.label}
                     </div>
-                    {detailEntry.variableCount !== undefined && (
+                    {detailEntry.detail && (
                       <div>
-                        <span className="text-muted-foreground">Variables: </span>
-                        {detailEntry.variableCount}
+                        <span className="text-muted-foreground">
+                          {detailEntry.kind === "environment" ? "Variables: " : "Contents: "}
+                        </span>
+                        {detailEntry.detail}
                       </div>
                     )}
                     {detailEntry.message && (

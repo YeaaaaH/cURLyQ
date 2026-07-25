@@ -1,5 +1,5 @@
 import { type KeyValuePair, ensureTrailingBlankRow, stripEmptyRows } from "@/lib/keyValue";
-import { type Environment, substituteVariables } from "@/lib/environments";
+import { type Environment, VARIABLE_PATTERN, substituteVariables } from "@/lib/environments";
 import type { HttpResponse } from "@/lib/http";
 
 export type SubTab = "params" | "headers" | "body";
@@ -114,9 +114,23 @@ export function statusVariant(status: number): "default" | "secondary" | "destru
 export function getUrlError(url: string, environment: Environment | null): string | null {
   const trimmed = url.trim();
   if (trimmed === "") return null;
+  const substituted = substituteVariables(trimmed, environment);
+
+  // A template URL (e.g. {{baseUrl}}/path, or even just http://{{host}}/path)
+  // may still contain an unresolved {{var}} if no environment is active or
+  // the variable isn't defined there — `new URL()` throws on the literal
+  // `{`/`}` characters even though the URL is perfectly valid once resolved.
+  // Fall back to a plain prefix check instead of full parsing in that case.
+  // (Variable names aren't limited to \w — see environments.ts's
+  // VARIABLE_PATTERN; matched here without the `g` flag since this is a
+  // one-shot `.test()`, not an iteration.)
+  if (/\{\{\s*[\w.-]+\s*\}\}/.test(substituted)) {
+    return /^https?:\/\//i.test(substituted) ? null : "URL must start with http:// or https://";
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(substituteVariables(trimmed, environment));
+    parsed = new URL(substituted);
   } catch {
     return "Enter a full URL, e.g. https://example.com";
   }
@@ -126,10 +140,71 @@ export function getUrlError(url: string, environment: Environment | null): strin
   return null;
 }
 
-export function getBodyError(body: string): string | null {
+// Strips Postman-style `//` and `/* */` comments from a JSON body before
+// parsing/sending — plain JSON doesn't allow comments, but Postman's own raw
+// body editor tolerates them for documentation, so requests built elsewhere
+// (or just typed by hand, matching Postman muscle memory) shouldn't break
+// here. String-aware so a "//" or "/*" inside an actual string value (e.g. a
+// URL) is left alone rather than treated as the start of a comment.
+export function stripJsonComments(text: string): string {
+  let result = "";
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (inString) {
+      result += ch;
+      if (ch === "\\") {
+        // Copy the escaped character verbatim (e.g. \" or \\) so it isn't
+        // mistaken for the string's closing quote.
+        result += next ?? "";
+        i++;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === "/" && next === "/") {
+      i++;
+      while (i + 1 < text.length && text[i + 1] !== "\n") i++;
+      continue;
+    }
+
+    if (ch === "/" && next === "*") {
+      i++;
+      while (i + 1 < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i++;
+      continue;
+    }
+
+    result += ch;
+  }
+  return result;
+}
+
+export function getBodyError(body: string, environment: Environment | null): string | null {
   if (body.trim() === "") return null;
+  // Resolve whatever the active environment can (so e.g. {{port}} used
+  // unquoted for a numeric value validates correctly once it substitutes to
+  // real digits), then treat anything still unresolved — no active
+  // environment, or the variable isn't defined there — as an opaque
+  // placeholder for validation purposes only. Postman itself doesn't block
+  // editing/sending over a {{var}} that hasn't resolved yet; it'll either
+  // resolve by send time or the server will complain, not the editor.
+  const withPlaceholders = substituteVariables(stripJsonComments(body), environment).replace(
+    VARIABLE_PATTERN,
+    "null"
+  );
   try {
-    JSON.parse(body);
+    JSON.parse(withPlaceholders);
     return null;
   } catch {
     return "Body is not valid JSON";

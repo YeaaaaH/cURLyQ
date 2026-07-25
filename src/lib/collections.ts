@@ -1,4 +1,6 @@
 import type { KeyValuePair } from "@/lib/keyValue";
+import { parseParamsFromUrl } from "@/lib/requestUrl";
+import { PostmanImportError, dedupeName } from "@/lib/postman";
 
 export interface FolderNode {
   type: "folder";
@@ -285,6 +287,172 @@ const BEFORE_ZONE_PREFIX = "__before__:";
 
 export function beforeZoneId(nodeId: string): string {
   return `${BEFORE_ZONE_PREFIX}${nodeId}`;
+}
+
+interface PostmanHeader {
+  key?: unknown;
+  value?: unknown;
+  disabled?: unknown;
+}
+
+interface PostmanRequestBody {
+  mode?: unknown;
+  raw?: unknown;
+}
+
+interface PostmanRequest {
+  method?: unknown;
+  url?: unknown;
+  header?: unknown;
+  body?: unknown;
+}
+
+interface PostmanItem {
+  name?: unknown;
+  item?: unknown;
+  request?: unknown;
+}
+
+// Postman's `url` is either a plain string or an object with a `raw` field
+// (plus a parsed-out protocol/host/path/query breakdown we don't need — we
+// derive params from `raw` the same way the rest of the app already does).
+function rawUrlOf(url: unknown): string {
+  if (typeof url === "string") return url;
+  if (typeof url === "object" && url !== null && typeof (url as { raw?: unknown }).raw === "string") {
+    return (url as { raw: string }).raw;
+  }
+  return "";
+}
+
+// Recursively maps a Postman `item` array into our CollectionNode tree.
+// `counter.skippedBody` is incremented for every request whose body uses a
+// mode we can't represent (v1 only supports a raw/JSON body) — that request
+// still imports with everything else intact, just an empty body, rather than
+// failing the whole import over one unsupported field.
+function mapPostmanItems(items: unknown[], counter: { skippedBody: number }): CollectionNode[] {
+  return items.map((raw): CollectionNode => {
+    const item = raw as PostmanItem;
+    const name = typeof item.name === "string" && item.name.trim() !== "" ? item.name : "Untitled";
+
+    if (Array.isArray(item.item)) {
+      return {
+        type: "folder",
+        id: crypto.randomUUID(),
+        name,
+        items: mapPostmanItems(item.item, counter),
+      };
+    }
+
+    const request = (item.request ?? {}) as PostmanRequest;
+    const url = rawUrlOf(request.url);
+    const method = typeof request.method === "string" ? request.method.toUpperCase() : "GET";
+
+    const headers: KeyValuePair[] = Array.isArray(request.header)
+      ? (request.header as PostmanHeader[])
+          .filter((h): h is PostmanHeader => typeof h?.key === "string")
+          .map((h) => ({
+            id: crypto.randomUUID(),
+            key: h.key as string,
+            value: typeof h.value === "string" ? h.value : "",
+            enabled: h.disabled !== true,
+          }))
+      : [];
+
+    let body = "";
+    if (request.body && typeof request.body === "object") {
+      const b = request.body as PostmanRequestBody;
+      if (b.mode === undefined || b.mode === "raw") {
+        body = typeof b.raw === "string" ? b.raw : "";
+      } else {
+        counter.skippedBody++;
+      }
+    }
+
+    return {
+      type: "request",
+      id: crypto.randomUUID(),
+      name,
+      method,
+      url,
+      params: parseParamsFromUrl(url),
+      headers,
+      body,
+    };
+  });
+}
+
+// Maps a parsed Postman v2.1 collection export into our Collection shape.
+// Throws PostmanImportError if `json` doesn't look like a Postman collection
+// at all. Returns how many requests had a body mode we can't represent
+// alongside the mapped collection, for the caller to note in the log.
+export function parsePostmanCollection(
+  json: unknown,
+  existing: Collection[]
+): { collection: Collection; skippedBodyCount: number } {
+  if (typeof json !== "object" || json === null) {
+    throw new PostmanImportError("Not a valid JSON file.");
+  }
+  const data = json as Record<string, unknown>;
+
+  if (Array.isArray(data.values)) {
+    throw new PostmanImportError(
+      "This looks like a Postman environment, not a collection — use \"Import environment...\" instead."
+    );
+  }
+  if (!Array.isArray(data.item)) {
+    throw new PostmanImportError('Missing an "item" array — not a Postman collection file.');
+  }
+
+  const info = (data.info ?? {}) as Record<string, unknown>;
+  const rawName =
+    typeof info.name === "string" && info.name.trim() !== "" ? info.name.trim() : "Imported collection";
+
+  const counter = { skippedBody: 0 };
+  const items = mapPostmanItems(data.item, counter);
+
+  return {
+    collection: {
+      id: crypto.randomUUID(),
+      name: dedupeName(rawName, new Set(existing.map((c) => c.name))),
+      items,
+    },
+    skippedBodyCount: counter.skippedBody,
+  };
+}
+
+function buildPostmanItems(items: CollectionNode[]): unknown[] {
+  return items.map((node) => {
+    if (node.type === "folder") {
+      return { name: node.name, item: buildPostmanItems(node.items) };
+    }
+    return {
+      name: node.name,
+      request: {
+        method: node.method,
+        header: node.headers
+          .filter((h) => h.key.trim() !== "")
+          .map((h) => ({ key: h.key, value: h.value, type: "text", disabled: !h.enabled })),
+        ...(node.body.trim() !== ""
+          ? { body: { mode: "raw", raw: node.body, options: { raw: { language: "json" } } } }
+          : {}),
+        url: { raw: node.url },
+      },
+    };
+  });
+}
+
+// Reverse of parsePostmanCollection above — doesn't try to round-trip an
+// original Postman id/schema-quirk, just needs to be re-importable (by us or
+// real Postman).
+export function buildPostmanCollection(collection: Collection) {
+  return {
+    info: {
+      _postman_id: collection.id,
+      name: collection.name,
+      schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    },
+    item: buildPostmanItems(collection.items),
+  };
 }
 
 // Single entry point for a drag-and-drop drop: `targetId` may be a

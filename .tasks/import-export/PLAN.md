@@ -1,11 +1,12 @@
 # Import/Export (Postman v2.1) — Plan
 
 Tracks import/export of Postman-format JSON, plus a session-only log of recent
-import/export executions. First pass scoped to **environments only** — collections
-import/export (Postman Collection v2.1) is a deferred follow-up once this lands.
+import/export executions. Environments landed first; collections followed as a
+second pass once that path was proven out.
 
-**Status: environment import, export, and the log panel are all done.** Only
-collections import/export (explicitly deferred from the start) remains.
+**Status: done** — environment import/export, collection import/export, and the
+log panel are all built. Only the "explicitly deferred" items below remain unbuilt,
+by design.
 
 ## Decisions made so far
 
@@ -48,6 +49,24 @@ collections import/export (explicitly deferred from the start) remains.
   (reusing the existing primitive, no new dependency) with the full untruncated,
   selectable error message, exact timestamp, and variable count — the popover row
   itself stays truncated to one line for scanning.
+- **Log entry shape, generalized for collections**: `variableCount?: number` was
+  environment-specific wording baked into the type. Replaced with `kind: "environment"
+  | "collection"` + a free-form `detail?: string` (e.g. `"12 variables"` or `"3
+  folders, 8 requests"`, built at the call site via a small `pluralize` helper) so
+  Sidebar's rendering doesn't need to special-case what's being imported/exported.
+- **Shared Postman helpers extracted**: `PostmanImportError` and the name-dedupe
+  helper (`dedupeName`) moved out of `environments.ts` into a new `src/lib/postman.ts`
+  — both environments.ts and collections.ts map to/from Postman JSON and need the
+  same error type (so `App.tsx` can catch either with one `instanceof` check) and the
+  same "keep the name recognizable, just make it unique" dedupe logic.
+- **Collections: non-raw request bodies on import** — a request whose Postman body
+  uses a mode our v1 scope can't represent (form-data, urlencoded, GraphQL — only
+  `raw`/absent is supported) still imports with everything else intact (method, url,
+  headers), just an empty body. The import toast/log note how many requests this
+  happened to, so nothing is silently dropped without a trace.
+- **Collections: name collision on import** — always creates a new `Collection`,
+  deduping the name the same way environment import does. Never merges into an
+  existing collection (avoids id-collision/merge-target ambiguity).
 
 ## New dependency: `@tauri-apps/plugin-dialog`
 
@@ -123,10 +142,11 @@ Native file open/save dialogs — not installed yet. Needs:
 ## Log panel — DONE
 
 - `ImportExportLogEntry` (`src/lib/importExportLog.ts`) — `id`, `timestamp`,
-  `direction` (`"import" | "export"`), `label` (environment name on success, file
-  name on failure — a failed parse may never produce a name), `variableCount?`,
-  `status`, `message?`. `pushLogEntry` caps the list at 10, newest first. Lives as
-  `App.tsx` state, passed down to `Sidebar`.
+  `direction` (`"import" | "export"`), `kind` (`"environment" | "collection"`),
+  `label` (name on success, file name on failure — a failed parse may never produce
+  a name), `detail?` (pre-formatted summary text), `status`, `message?`.
+  `pushLogEntry` caps the list at 10, newest first. Lives as `App.tsx` state, passed
+  down to `Sidebar`.
 - Trigger: `History`-icon ghost button, full-width, at the bottom of the sidebar's
   flex column. Opens a `Popover` (`side="top"`, `align="start"`) listing entries —
   status icon, single-line-truncated summary, relative time (`formatRelativeTime`).
@@ -137,10 +157,79 @@ Native file open/save dialogs — not installed yet. Needs:
   popover's necessarily-truncated single-line message was cutting off real error
   text (e.g. a JSON `SyntaxError`) with no way to read the rest.
 
+## Postman Collection v2.1 format (what we're parsing/emitting)
+
+```json
+{
+  "info": { "name": "My Collection", "schema": ".../collection/v2.1.0/collection.json" },
+  "item": [
+    { "name": "Folder", "item": [ /* nested items */ ] },
+    {
+      "name": "Request",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Content-Type", "value": "application/json", "disabled": false } ],
+        "body": { "mode": "raw", "raw": "{...}" },
+        "url": { "raw": "https://api.example.com/path?q=1" }
+      }
+    }
+  ]
+}
+```
+
+## Mapping to our model (collections)
+
+- An `item` is a **folder** if it has its own `item` array, otherwise a **request**
+  (has a `request` field) — recursive, arbitrary depth, matching `CollectionNode`'s
+  own discriminated union.
+- `request.url` is either a plain string or `{ raw, protocol, host, path, query }` —
+  we only ever read `.raw` (or the bare string). `params` isn't read from Postman's
+  `url.query` array at all; it's derived from the final url string via the existing
+  `parseParamsFromUrl` — the same single-source-of-truth the rest of the app already
+  uses, so an imported request's Params tab can't disagree with its URL bar.
+- `request.header[].{key,value,disabled}` → `KeyValuePair` (`enabled = !disabled`).
+- `request.body` — only `mode: "raw"` (or an absent body) is understood; anything
+  else imports as an empty body (see the non-raw-body note above).
+- Export is the reverse, adding back `info.schema`/`info._postman_id` and
+  `request.url.raw`/`request.body.mode: "raw"` — doesn't attempt to rebuild
+  `url.protocol`/`host`/`path`/`query` or emit `response: []`, both optional in the
+  Postman schema and not needed for the file to be re-importable.
+
+## Import flow (collections) — DONE
+
+1. "Import collection..." in the sidebar "+" dropdown (alongside "Import
+   environment..."), same `open()` file dialog.
+2. Same `read_text_file` Rust command as environment import — no new backend code
+   needed, since it's already just raw text in, raw text out.
+3. `parsePostmanCollection(json, existing)` (`src/lib/collections.ts`) validates the
+   shape (rejects a `values` array as "looks like an environment", requires an `item`
+   array), recursively maps into a fresh `Collection` tree, and dedupes the
+   collection's name against `existing` collections.
+4. `handleImportCollection` (`App.tsx`) appends the result to `collections` state
+   (existing debounced `save_collections` effect persists it).
+5. Log entry + toast note the folder/request counts (`countNodes`, already existed
+   for the delete-confirmation wording) and, if any, how many requests had an
+   unsupported body mode.
+
+## Export flow (collections) — DONE
+
+1. "Export..." in the collection row's own "..." `NodeMenu` (`CollectionTree.tsx`) —
+   **only the collection root**, not folder/request rows inside it; `NodeMenu` gained
+   an optional `onExport` prop so folder/request rows (which don't pass it) simply
+   don't render that menu item.
+2. `buildPostmanCollection(collection)` (`src/lib/collections.ts`), default filename
+   `<name>.postman_collection.json`, same `write_text_file` command as environment
+   export.
+3. Same log-entry-plus-toast pattern as everything else.
+
 ## Explicitly deferred (this pass)
 
-- Collections import/export (Postman Collection v2.1 — `item[]` tree, `request`
-  method/url/headers/body mapping) — separate follow-up.
 - Secret-type variable masking (Postman's `type: "secret"`).
 - Preserving Postman's own `id`/`_postman_*` metadata for round-trip fidelity.
 - Persisting the log across restarts.
+- Non-raw request body modes (form-data, urlencoded, GraphQL) — imported as an empty
+  body rather than represented some other way, since v1 scope is raw/JSON bodies only.
+- Exporting a single folder as its own Postman collection (Postman itself supports
+  this) — only whole-collection export is built.
+- Rebuilding `url.protocol`/`host`/`path`/`query` on export — only `url.raw` is
+  emitted, which is sufficient for Postman (or this app) to re-derive the rest.

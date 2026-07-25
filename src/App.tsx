@@ -22,7 +22,6 @@ import {
 } from "@/lib/keyValue";
 import {
   type Environment,
-  PostmanImportError,
   buildPostmanEnvironment,
   createEnvironment,
   getUnresolvedVariables,
@@ -30,13 +29,16 @@ import {
   parsePostmanEnvironment,
   substituteVariables,
 } from "@/lib/environments";
+import { PostmanImportError } from "@/lib/postman";
 import { buildRequestUrl, parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
-import { type ImportExportLogEntry, pushLogEntry } from "@/lib/importExportLog";
+import { type ImportExportLogEntry, pluralize, pushLogEntry } from "@/lib/importExportLog";
 import {
   type Collection,
   type RequestNode,
   addNodeToCollection,
+  buildPostmanCollection,
   collectRequestIds,
+  countNodes,
   createCollection,
   createFolderNode,
   createRequestNode,
@@ -44,6 +46,7 @@ import {
   deleteCollectionNode,
   findCollectionNode,
   moveNodeRelativeToTarget,
+  parsePostmanCollection,
   renameCollection,
   renameCollectionNode,
 } from "@/lib/collections";
@@ -55,6 +58,7 @@ import {
   fromPersistedTab,
   getBodyError,
   getUrlError,
+  stripJsonComments,
   toPersistedTab,
 } from "@/lib/requestTabs";
 import { Sidebar } from "@/components/Sidebar";
@@ -300,22 +304,30 @@ function App() {
       setEnvironments((prev) => [...prev, environment]);
       setEditingEnvironmentId(environment.id);
       setEnvironmentEditorOpen(true);
-      const variableCount = environment.variables.filter((v) => v.key.trim() !== "").length;
+      const detail = pluralize(
+        environment.variables.filter((v) => v.key.trim() !== "").length,
+        "variable"
+      );
       setImportExportLog((prev) =>
         pushLogEntry(prev, {
           direction: "import",
+          kind: "environment",
           label: environment.name,
-          variableCount,
+          detail,
           status: "success",
         })
       );
-      toast.success(`Imported "${environment.name}"`, {
-        description: `${variableCount} variable${variableCount === 1 ? "" : "s"}`,
-      });
+      toast.success(`Imported "${environment.name}"`, { description: detail });
     } catch (err) {
       const message = err instanceof PostmanImportError ? err.message : String(err);
       setImportExportLog((prev) =>
-        pushLogEntry(prev, { direction: "import", label: fileName, status: "error", message })
+        pushLogEntry(prev, {
+          direction: "import",
+          kind: "environment",
+          label: fileName,
+          status: "error",
+          message,
+        })
       );
       toast.error(`Couldn't import "${fileName}"`, { description: message });
     }
@@ -331,27 +343,125 @@ function App() {
     });
     if (!path) return;
 
-    const variableCount = environment.variables.filter((v) => v.key.trim() !== "").length;
+    const detail = pluralize(
+      environment.variables.filter((v) => v.key.trim() !== "").length,
+      "variable"
+    );
     try {
       const json = JSON.stringify(buildPostmanEnvironment(environment), null, 2);
       await invoke("write_text_file", { path, contents: json });
       setImportExportLog((prev) =>
         pushLogEntry(prev, {
           direction: "export",
+          kind: "environment",
           label: environment.name,
-          variableCount,
+          detail,
           status: "success",
         })
       );
-      toast.success(`Exported "${environment.name}"`, {
-        description: `${variableCount} variable${variableCount === 1 ? "" : "s"}`,
-      });
+      toast.success(`Exported "${environment.name}"`, { description: detail });
     } catch (err) {
       const message = String(err);
       setImportExportLog((prev) =>
-        pushLogEntry(prev, { direction: "export", label: environment.name, status: "error", message })
+        pushLogEntry(prev, {
+          direction: "export",
+          kind: "environment",
+          label: environment.name,
+          status: "error",
+          message,
+        })
       );
       toast.error(`Couldn't export "${environment.name}"`, { description: message });
+    }
+  }
+
+  function describeCollectionCounts(items: Collection["items"]): string {
+    const counts = countNodes(items);
+    const parts: string[] = [];
+    if (counts.folders > 0) parts.push(pluralize(counts.folders, "folder"));
+    if (counts.requests > 0) parts.push(pluralize(counts.requests, "request"));
+    return parts.length > 0 ? parts.join(", ") : "empty";
+  }
+
+  async function handleImportCollection() {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!path) return;
+    const fileName = path.split(/[\\/]/).pop() ?? path;
+
+    try {
+      const raw = await invoke<string>("read_text_file", { path });
+      const { collection, skippedBodyCount } = parsePostmanCollection(JSON.parse(raw), collections);
+      setCollections((prev) => [...prev, collection]);
+      const detail = describeCollectionCounts(collection.items);
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "import",
+          kind: "collection",
+          label: collection.name,
+          detail,
+          status: "success",
+        })
+      );
+      toast.success(`Imported "${collection.name}"`, {
+        description:
+          skippedBodyCount > 0
+            ? `${detail} — ${pluralize(skippedBodyCount, "request")} had an unsupported body, imported empty`
+            : detail,
+      });
+    } catch (err) {
+      const message = err instanceof PostmanImportError ? err.message : String(err);
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "import",
+          kind: "collection",
+          label: fileName,
+          status: "error",
+          message,
+        })
+      );
+      toast.error(`Couldn't import "${fileName}"`, { description: message });
+    }
+  }
+
+  async function handleExportCollection(id: string) {
+    const collection = collections.find((c) => c.id === id);
+    if (!collection) return;
+
+    const path = await save({
+      defaultPath: `${collection.name}.postman_collection.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!path) return;
+
+    const detail = describeCollectionCounts(collection.items);
+    try {
+      const json = JSON.stringify(buildPostmanCollection(collection), null, 2);
+      await invoke("write_text_file", { path, contents: json });
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "export",
+          kind: "collection",
+          label: collection.name,
+          detail,
+          status: "success",
+        })
+      );
+      toast.success(`Exported "${collection.name}"`, { description: detail });
+    } catch (err) {
+      const message = String(err);
+      setImportExportLog((prev) =>
+        pushLogEntry(prev, {
+          direction: "export",
+          kind: "collection",
+          label: collection.name,
+          status: "error",
+          message,
+        })
+      );
+      toast.error(`Couldn't export "${collection.name}"`, { description: message });
     }
   }
 
@@ -556,7 +666,10 @@ function App() {
     () => getUrlError(activeRequest.url, activeEnvironment),
     [activeRequest.url, activeEnvironment]
   );
-  const bodyError = useMemo(() => getBodyError(activeRequest.body), [activeRequest.body]);
+  const bodyError = useMemo(
+    () => getBodyError(activeRequest.body, activeEnvironment),
+    [activeRequest.body, activeEnvironment]
+  );
   const canSend = !isUrlEmpty && !urlError;
   const unresolvedVariables = useMemo(
     () =>
@@ -584,7 +697,7 @@ function App() {
       .filter(({ key, enabled }) => enabled && key.trim() !== "")
       .map(({ key, value }) => [key, substituteVariables(value, activeEnvironment)] as [string, string]);
 
-    const substitutedBody = substituteVariables(body, activeEnvironment);
+    const substitutedBody = substituteVariables(stripJsonComments(body), activeEnvironment);
     const trimmedBody = substitutedBody.trim();
     const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
     if (trimmedBody !== "" && !hasContentType) {
@@ -639,6 +752,8 @@ function App() {
         onEditEnvironment={openEnvironmentEditor}
         onAddEnvironment={handleAddEnvironment}
         onImportEnvironment={handleImportEnvironment}
+        onImportCollection={handleImportCollection}
+        onExportCollection={handleExportCollection}
         onExportEnvironment={handleExportEnvironment}
         onDeleteEnvironment={requestDeleteEnvironment}
         importExportLog={importExportLog}

@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, Folder, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Download, Folder, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { METHOD_COLORS } from "@/lib/http";
 import {
@@ -127,11 +127,13 @@ function NodeMenu({
   onNewFolder,
   onNewRequest,
   onRename,
+  onExport,
   onDelete,
 }: {
   onNewFolder?: () => void;
   onNewRequest?: () => void;
   onRename: () => void;
+  onExport?: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -165,6 +167,12 @@ function NodeMenu({
           <Pencil className="size-3.5" />
           Rename
         </DropdownMenuItem>
+        {onExport && (
+          <DropdownMenuItem onClick={onExport}>
+            <Download className="size-3.5" />
+            Export...
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 className="size-3.5" />
           Delete
@@ -413,7 +421,12 @@ function NodeRow({
         onClick={() => onOpenRequest(collectionId, node)}
         className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:text-foreground"
       >
-        <span className={cn("w-8 shrink-0 text-[10px] font-semibold", METHOD_COLORS[node.method])}>
+        <span
+          className={cn(
+            "w-8 shrink-0 overflow-hidden text-[9px] font-semibold tracking-tighter",
+            METHOD_COLORS[node.method]
+          )}
+        >
           {node.method}
         </span>
         {isRenaming ? (
@@ -445,6 +458,7 @@ function CollectionRow({
   setRenamingId,
   onRenameCollection,
   onRequestDeleteCollection,
+  onExportCollection,
   onAddFolder,
   onAddRequest,
   handlers,
@@ -456,6 +470,7 @@ function CollectionRow({
   setRenamingId: (id: string | null) => void;
   onRenameCollection: (id: string, name: string) => void;
   onRequestDeleteCollection: () => void;
+  onExportCollection: (id: string) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
   handlers: TreeHandlers;
@@ -511,6 +526,7 @@ function CollectionRow({
             setOpen(collection.id, true);
           }}
           onRename={() => setRenamingId(collection.id)}
+          onExport={() => onExportCollection(collection.id)}
           onDelete={onRequestDeleteCollection}
         />
       </div>
@@ -534,6 +550,7 @@ export function CollectionTree({
   collections,
   onRenameCollection,
   onDeleteCollection,
+  onExportCollection,
   onOpenRequest,
   onAddFolder,
   onAddRequest,
@@ -544,6 +561,7 @@ export function CollectionTree({
   collections: Collection[];
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
+  onExportCollection: (id: string) => void;
   onOpenRequest: (collectionId: string, node: RequestNode) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
@@ -654,6 +672,7 @@ export function CollectionTree({
               setRenamingId={setRenamingId}
               onRenameCollection={onRenameCollection}
               onRequestDeleteCollection={() => requestDeleteCollection(collection)}
+              onExportCollection={onExportCollection}
               onAddFolder={onAddFolder}
               onAddRequest={onAddRequest}
               handlers={handlers}
@@ -665,7 +684,12 @@ export function CollectionTree({
         {dragPreview && (
           <div className="flex items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-md">
             {dragPreview.method ? (
-              <span className={cn("w-8 shrink-0 text-[10px] font-semibold", METHOD_COLORS[dragPreview.method])}>
+              <span
+                className={cn(
+                  "w-8 shrink-0 overflow-hidden text-[9px] font-semibold tracking-tighter",
+                  METHOD_COLORS[dragPreview.method]
+                )}
+              >
                 {dragPreview.method}
               </span>
             ) : (

@@ -1,4 +1,5 @@
 import { type KeyValuePair, ensureTrailingBlankRow, stripEmptyRows } from "@/lib/keyValue";
+import { PostmanImportError, dedupeName } from "@/lib/postman";
 
 export interface Environment {
   id: string;
@@ -48,16 +49,21 @@ export function nextEnvironmentName(existing: Environment[]): string {
 // matching enabled variable) are left as-is — substitution only ever happens
 // on a copy used for validation/sending, never written back into state, so
 // the raw {{varName}} stays visible and editable in the UI.
+// Variable names aren't limited to \w — Postman-style keys commonly use
+// kebab-case (e.g. {{api-gateway}}) or dotted namespacing (e.g.
+// {{service.host}}), neither of which \w alone matches.
+export const VARIABLE_PATTERN = /\{\{\s*([\w.-]+)\s*\}\}/g;
+
 export function substituteVariables(text: string, environment: Environment | null): string {
   if (!environment) return text;
-  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (placeholder, name) => {
+  return text.replace(VARIABLE_PATTERN, (placeholder, name) => {
     const variable = environment.variables.find((v) => v.enabled && v.key === name);
     return variable ? variable.value : placeholder;
   });
 }
 
 export function findVariableNames(text: string): string[] {
-  return [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
+  return [...text.matchAll(VARIABLE_PATTERN)].map((m) => m[1]);
 }
 
 // Scans the given texts for {{varName}} placeholders that wouldn't resolve
@@ -96,24 +102,10 @@ export function buildPostmanEnvironment(environment: Environment) {
   };
 }
 
-export class PostmanImportError extends Error {}
-
 interface PostmanEnvironmentValue {
   key?: unknown;
   value?: unknown;
   enabled?: unknown;
-}
-
-// Keeps the imported name recognizable ("Dev", "Dev (2)", ...) instead of
-// nextEnvironmentName's capital-city scheme, which is only for brand-new,
-// user-has-no-opinion-yet environments — an imported file already has a name
-// the user picked, we just need to keep it unique.
-function dedupeName(name: string, existingNames: Set<string>): string {
-  if (!existingNames.has(name)) return name;
-  for (let i = 2; ; i++) {
-    const candidate = `${name} (${i})`;
-    if (!existingNames.has(candidate)) return candidate;
-  }
 }
 
 // Maps a parsed Postman v2.1 environment export into our Environment shape.

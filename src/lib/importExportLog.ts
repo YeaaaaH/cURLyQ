@@ -2,15 +2,23 @@ export interface ImportExportLogEntry {
   id: string;
   timestamp: number;
   direction: "import" | "export";
-  // The environment's own name on success; the picked/target file name on
-  // failure, since a failed parse may never produce a name to show.
+  kind: "environment" | "collection";
+  // The environment/collection's own name on success; the picked/target file
+  // name on failure, since a failed parse may never produce a name to show.
   label: string;
-  variableCount?: number;
+  // Pre-formatted, e.g. "12 variables" or "3 folders, 8 requests" — kept as
+  // free text rather than a structured count so environments and collections
+  // don't need separate fields for what's ultimately just a summary line.
+  detail?: string;
   status: "success" | "error";
   message?: string;
 }
 
 const LOG_CAPACITY = 10;
+
+export function pluralize(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
 
 export function pushLogEntry(
   log: ImportExportLogEntry[],

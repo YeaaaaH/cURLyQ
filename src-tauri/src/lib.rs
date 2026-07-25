@@ -96,7 +96,20 @@ async fn send_request(
     if let Some(body) = body {
         request = request.body(body);
     }
-    let response = request.send().await.map_err(|e| e.to_string())?;
+    // reqwest's own error classification (is_connect/is_timeout) is far more
+    // reliable than pattern-matching the message text, which varies by OS
+    // (e.g. "Connection refused (os error 10061)" on Windows vs. "(os error
+    // 111)" on Linux). The technical detail stays appended for debugging —
+    // just with a plain-language headline in front of it.
+    let response = request.send().await.map_err(|e| {
+        if e.is_connect() {
+            format!("Couldn't connect to the server — it may not be running, or the address/port may be wrong.\n\n{e}")
+        } else if e.is_timeout() {
+            format!("The request timed out — the server didn't respond in time.\n\n{e}")
+        } else {
+            e.to_string()
+        }
+    })?;
 
     let status = response.status().as_u16();
     let headers = response
