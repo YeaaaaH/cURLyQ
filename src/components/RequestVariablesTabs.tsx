@@ -1,7 +1,17 @@
 import { Card } from "@/components/ui/card";
 import type { KeyValuePair } from "@/lib/keyValue";
+import { DEFAULT_HEADERS } from "@/lib/http";
 import type { RequestTab } from "@/lib/requestTabs";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
+
+// Which of DEFAULT_HEADERS aren't already covered by one of the user's own
+// header rows (case-insensitive, non-empty key) — those are shown as locked
+// rows; a header the user set explicitly always wins instead of doubling up.
+function unmatchedDefaultHeaders(headers: KeyValuePair[]) {
+  return DEFAULT_HEADERS.filter(
+    (def) => !headers.some((h) => h.key.trim().toLowerCase() === def.key.toLowerCase())
+  );
+}
 
 export function RequestVariablesTabs({
   activeRequest,
@@ -28,7 +38,12 @@ export function RequestVariablesTabs({
         <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
       )}
       {activeRequest.activeSubTab === "headers" && (
-        <KeyValueEditor rows={activeRequest.headers} onUpdate={updateHeader} onRemove={removeHeader} />
+        <KeyValueEditor
+          rows={activeRequest.headers}
+          onUpdate={updateHeader}
+          onRemove={removeHeader}
+          lockedRows={unmatchedDefaultHeaders(activeRequest.headers)}
+        />
       )}
       {activeRequest.activeSubTab === "body" && (
         <div className="flex h-full min-h-0 flex-col gap-1.5">

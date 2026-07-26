@@ -189,6 +189,24 @@ export function updateCollectionRequestMethod(
   );
 }
 
+// Writes the full editable field set of a request node back into the tree in
+// one shot — used by the explicit Save gesture (Ctrl+S / Save button), which
+// needs to sync url/params/headers/body together, unlike the narrow
+// single-field live-sync helpers above (name on blur, method on change).
+// Guarded to request nodes only, same as updateCollectionRequestMethod.
+export function updateCollectionRequestFields(
+  collections: Collection[],
+  collectionId: string,
+  nodeId: string,
+  fields: Pick<RequestNode, "name" | "method" | "url" | "params" | "headers" | "body">
+): Collection[] {
+  return collections.map((c) =>
+    c.id === collectionId
+      ? { ...c, items: mapItems(c.items, nodeId, (n) => (n.type === "request" ? { ...n, ...fields } : n)) }
+      : c
+  );
+}
+
 export function deleteCollectionNode(
   collections: Collection[],
   collectionId: string,

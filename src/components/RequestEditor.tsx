@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Copy, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HTTP_METHODS } from "@/lib/http";
 import { SUB_TABS, type RequestTab } from "@/lib/requestTabs";
@@ -21,6 +22,8 @@ export function RequestEditor({
   canSend,
   urlError,
   unresolvedVariables,
+  onSave,
+  onSaveAs,
 }: {
   activeRequest: RequestTab;
   onUpdate: (patch: Partial<RequestTab>) => void;
@@ -31,6 +34,8 @@ export function RequestEditor({
   canSend: boolean;
   urlError: string | null;
   unresolvedVariables: string[];
+  onSave: () => void;
+  onSaveAs: () => void;
 }) {
   return (
     <>
@@ -69,6 +74,26 @@ export function RequestEditor({
             placeholder="https://example.com"
             aria-invalid={urlError !== null}
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onSave}
+            aria-label="Save request"
+            title="Save (Ctrl+S)"
+          >
+            <Save />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onSaveAs}
+            aria-label="Save request as..."
+            title="Save as..."
+          >
+            <Copy />
+          </Button>
           <Button type="submit" className="w-24" disabled={activeRequest.isSending || !canSend}>
             {activeRequest.isSending ? "Sending…" : "Send"}
           </Button>

@@ -49,9 +49,10 @@ import {
   parsePostmanCollection,
   renameCollection,
   renameCollectionNode,
+  updateCollectionRequestFields,
   updateCollectionRequestMethod,
 } from "@/lib/collections";
-import type { HttpResponse } from "@/lib/http";
+import { DEFAULT_HEADERS, type HttpResponse } from "@/lib/http";
 import {
   type PersistedTabsFile,
   type RequestTab,
@@ -65,6 +66,7 @@ import {
 import { Sidebar } from "@/components/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import { RequestEditor } from "@/components/RequestEditor";
+import { SaveRequestDialog } from "@/components/SaveRequestDialog";
 import { RequestVariablesTabs } from "@/components/RequestVariablesTabs";
 import { ResponseContainer } from "@/components/ResponseContainer";
 
@@ -576,6 +578,68 @@ function App() {
     }
   }
 
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  // The explicit Save gesture (Ctrl+S / Save button). A tab already linked to
+  // a collection request updates that request in place; a fresh,
+  // never-saved tab has nowhere to save *to* yet, so it opens the "Save
+  // to..." picker instead.
+  function handleSaveActiveRequest() {
+    if (!activeRequest.sourceRequestId || !activeRequest.sourceCollectionId) {
+      setSaveDialogOpen(true);
+      return;
+    }
+    setCollections((prev) =>
+      updateCollectionRequestFields(prev, activeRequest.sourceCollectionId!, activeRequest.sourceRequestId!, {
+        name: activeRequest.name,
+        method: activeRequest.method,
+        url: activeRequest.url,
+        params: stripEmptyRows(activeRequest.params),
+        headers: stripEmptyRows(activeRequest.headers),
+        body: activeRequest.body,
+      })
+    );
+  }
+
+  // "Save as" always opens the picker, even for a tab that already has a
+  // source — forking a copy rather than overwriting the linked request.
+  function handleSaveActiveRequestAs() {
+    setSaveDialogOpen(true);
+  }
+
+  // Confirming the "Save to..." picker always creates a brand-new request
+  // node (even for "Save as" on an already-linked tab, which is exactly the
+  // fork behavior that action is for) and re-points the active tab at it, so
+  // the tab that's open keeps editing whatever it was just saved as.
+  function handleConfirmSaveTo(collectionId: string, parentFolderId: string | null, name: string) {
+    const node: RequestNode = {
+      type: "request",
+      id: crypto.randomUUID(),
+      name,
+      method: activeRequest.method,
+      url: activeRequest.url,
+      params: stripEmptyRows(activeRequest.params),
+      headers: stripEmptyRows(activeRequest.headers),
+      body: activeRequest.body,
+    };
+    setCollections((prev) => addNodeToCollection(prev, collectionId, parentFolderId, node));
+    updateActiveRequest({ name, sourceRequestId: node.id, sourceCollectionId: collectionId });
+    setSaveDialogOpen(false);
+  }
+
+  // Ctrl+S (Cmd+S on macOS) saves the active tab from anywhere in the window,
+  // matching every other editor's muscle memory — without preventDefault the
+  // browser's native "Save page" dialog would fire instead.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== "s" || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      handleSaveActiveRequest();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  });
+
   function handleAddTab() {
     const tab = createRequestTab();
     setRequests((prev) => [...prev, tab]);
@@ -716,6 +780,11 @@ function App() {
     if (trimmedBody !== "" && !hasContentType) {
       requestHeaders.push(["Content-Type", "application/json"]);
     }
+    for (const { key, value } of DEFAULT_HEADERS) {
+      if (!requestHeaders.some(([k]) => k.toLowerCase() === key.toLowerCase())) {
+        requestHeaders.push([key, value]);
+      }
+    }
 
     updateActiveRequest({ error: null, response: null, isSending: true });
     try {
@@ -820,6 +889,8 @@ function App() {
           canSend={canSend}
           urlError={urlError}
           unresolvedVariables={unresolvedVariables}
+          onSave={handleSaveActiveRequest}
+          onSaveAs={handleSaveActiveRequestAs}
         />
       </div>
 
@@ -838,6 +909,15 @@ function App() {
         <ResponseContainer error={activeRequest.error} response={activeRequest.response} />
       </div>
     </main>
+
+    <SaveRequestDialog
+      open={saveDialogOpen}
+      onOpenChange={setSaveDialogOpen}
+      collections={collections}
+      defaultName={activeRequest.name}
+      onAddCollection={handleAddCollection}
+      onConfirm={handleConfirmSaveTo}
+    />
     </>
   );
 }

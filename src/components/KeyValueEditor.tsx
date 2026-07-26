@@ -10,10 +10,15 @@ export const KeyValueEditor = memo(function KeyValueEditor({
   rows,
   onUpdate,
   onRemove,
+  lockedRows = [],
 }: {
   rows: KeyValuePair[];
   onUpdate: (index: number, patch: Partial<KeyValuePair>) => void;
   onRemove: (index: number) => void;
+  // Read-only rows shown above the editable ones — e.g. default headers
+  // that are sent automatically. Not part of `rows`/persisted data; purely
+  // informational, so there's no enabled/remove affordance for them.
+  lockedRows?: { key: string; value: string }[];
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -23,6 +28,18 @@ export const KeyValueEditor = memo(function KeyValueEditor({
         <span className="flex-1">Value</span>
         <span className="w-8" />
       </div>
+      {lockedRows.map((row) => (
+        <div
+          key={`locked-${row.key}`}
+          className="flex items-center gap-2"
+          title="Sent automatically unless you add your own"
+        >
+          <Checkbox checked disabled className="opacity-70" aria-label={`${row.key} is sent automatically`} />
+          <Input className="font-mono" value={row.key} disabled />
+          <Input className="font-mono" value={row.value} disabled />
+          <span className="size-8 shrink-0" />
+        </div>
+      ))}
       {rows.map((row, index) => {
         const isTrailingEmpty =
           index === rows.length - 1 && row.key.trim() === "" && row.value.trim() === "";
