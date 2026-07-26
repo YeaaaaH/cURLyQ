@@ -41,7 +41,7 @@ import { type ImportExportLogEntry, formatRelativeTime } from "@/lib/importExpor
 import { CollectionTree } from "@/components/CollectionTree";
 
 export function Sidebar({
-  sidebarWidth,
+  sidebarOpen,
   onHandlePointerDown,
   environments,
   activeEnvironmentId,
@@ -65,7 +65,7 @@ export function Sidebar({
   onDeleteCollectionNode,
   onMoveCollectionNode,
 }: {
-  sidebarWidth: number;
+  sidebarOpen: boolean;
   onHandlePointerDown: (e: React.PointerEvent) => void;
   environments: Environment[];
   activeEnvironmentId: string | null;
@@ -125,8 +125,10 @@ export function Sidebar({
   return (
     <>
       <div
-        className="fixed inset-y-0 left-0 z-30 overflow-hidden border-r bg-muted transition-[width] duration-150"
-        style={{ width: sidebarWidth }}
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 overflow-hidden border-r bg-muted transition-[width] duration-150",
+          sidebarOpen ? "w-[max(16vw,180px)]" : "w-0"
+        )}
       >
         <div className="flex h-full w-[16vw] min-w-[180px] flex-col gap-1 p-3">
           <div className="flex shrink-0 items-center gap-1.5 pb-1">
@@ -377,8 +379,10 @@ export function Sidebar({
         onPointerDown={onHandlePointerDown}
         role="separator"
         aria-label="Drag to open the environments sidebar"
-        className="fixed inset-y-0 z-40 w-1 cursor-ew-resize touch-none hover:bg-foreground/20"
-        style={{ left: sidebarWidth }}
+        className={cn(
+          "fixed inset-y-0 z-40 w-1 cursor-ew-resize touch-none hover:bg-foreground/20",
+          sidebarOpen ? "left-[max(16vw,180px)]" : "left-0"
+        )}
       />
     </>
   );

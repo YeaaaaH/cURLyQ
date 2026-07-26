@@ -66,6 +66,14 @@ export function findVariableNames(text: string): string[] {
   return [...text.matchAll(VARIABLE_PATTERN)].map((m) => m[1]);
 }
 
+// The resolved value for a single {{name}}, or null if nothing in the active
+// environment matches — used by the {{var}} highlighting/hover popup to show
+// what a token actually resolves to (or that it doesn't).
+export function resolveVariable(name: string, environment: Environment | null): string | null {
+  const variable = environment?.variables.find((v) => v.enabled && v.key === name);
+  return variable ? variable.value : null;
+}
+
 // Scans the given texts for {{varName}} placeholders that wouldn't resolve
 // against the active environment, for a non-blocking UI hint.
 export function getUnresolvedVariables(texts: string[], environment: Environment | null): string[] {
@@ -81,6 +89,17 @@ export function getUnresolvedVariables(texts: string[], environment: Environment
     }
   }
   return [...unresolved];
+}
+
+// Every distinct {{varName}} used anywhere across the given texts (resolved
+// or not) — used by the "Variables in request" panel, which unlike
+// getUnresolvedVariables above needs the full set, not just the broken ones.
+export function findAllVariableNames(texts: string[]): string[] {
+  const names = new Set<string>();
+  for (const text of texts) {
+    for (const name of findVariableNames(text)) names.add(name);
+  }
+  return [...names];
 }
 
 // Reverse of parsePostmanEnvironment below — the exported file only needs to

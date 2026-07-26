@@ -1,6 +1,7 @@
 import { type KeyValuePair, ensureTrailingBlankRow, stripEmptyRows } from "@/lib/keyValue";
 import { type Environment, VARIABLE_PATTERN, substituteVariables } from "@/lib/environments";
-import type { HttpResponse } from "@/lib/http";
+import { DEFAULT_HEADERS, type HttpResponse } from "@/lib/http";
+import { buildRequestUrl } from "@/lib/requestUrl";
 
 export type SubTab = "params" | "headers" | "body";
 
@@ -209,4 +210,52 @@ export function getBodyError(body: string, environment: Environment | null): str
   } catch {
     return "Body is not valid JSON";
   }
+}
+
+export interface OutgoingRequest {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: string | null;
+}
+
+// Everything actually sent over the wire for `request` — variables
+// substituted, params merged into the URL's query string, and the same
+// default-header rules (Content-Type if there's a body and none was set,
+// User-Agent if none was set) applied. Factored out of handleSend so the
+// "Variables in request" panel's cURL preview shows exactly what would go
+// out, rather than a second computation that could quietly drift from it.
+export function buildOutgoingRequest(request: RequestTab, environment: Environment | null): OutgoingRequest {
+  const { method, url, params, headers, body } = request;
+
+  let requestUrl: string;
+  try {
+    requestUrl = buildRequestUrl(
+      substituteVariables(url, environment),
+      params.map((p) => ({ ...p, value: substituteVariables(p.value, environment) }))
+    );
+  } catch {
+    // Not a valid absolute URL yet (mid-edit, or a template that hasn't
+    // resolved) — fall back to the substituted raw string so the preview
+    // still shows something close, instead of throwing during a render.
+    requestUrl = substituteVariables(url, environment);
+  }
+
+  const requestHeaders = headers
+    .filter(({ key, enabled }) => enabled && key.trim() !== "")
+    .map(({ key, value }) => [key, substituteVariables(value, environment)] as [string, string]);
+
+  const substitutedBody = substituteVariables(stripJsonComments(body), environment);
+  const trimmedBody = substitutedBody.trim();
+  const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
+  if (trimmedBody !== "" && !hasContentType) {
+    requestHeaders.push(["Content-Type", "application/json"]);
+  }
+  for (const { key, value } of DEFAULT_HEADERS) {
+    if (!requestHeaders.some(([k]) => k.toLowerCase() === key.toLowerCase())) {
+      requestHeaders.push([key, value]);
+    }
+  }
+
+  return { method, url: requestUrl, headers: requestHeaders, body: trimmedBody === "" ? null : substitutedBody };
 }

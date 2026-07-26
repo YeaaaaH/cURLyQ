@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,13 +25,14 @@ import {
   type Environment,
   buildPostmanEnvironment,
   createEnvironment,
+  findAllVariableNames,
   getUnresolvedVariables,
   nextEnvironmentName,
   parsePostmanEnvironment,
-  substituteVariables,
 } from "@/lib/environments";
+import { buildCurlCommand } from "@/lib/curl";
 import { PostmanImportError } from "@/lib/postman";
-import { buildRequestUrl, parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
+import { parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
 import { type ImportExportLogEntry, pluralize, pushLogEntry } from "@/lib/importExportLog";
 import {
   type Collection,
@@ -52,21 +54,22 @@ import {
   updateCollectionRequestFields,
   updateCollectionRequestMethod,
 } from "@/lib/collections";
-import { DEFAULT_HEADERS, type HttpResponse } from "@/lib/http";
+import type { HttpResponse } from "@/lib/http";
 import {
   type PersistedTabsFile,
   type RequestTab,
+  buildOutgoingRequest,
   createRequestTab,
   fromPersistedTab,
   getBodyError,
   getUrlError,
-  stripJsonComments,
   toPersistedTab,
 } from "@/lib/requestTabs";
 import { Sidebar } from "@/components/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import { RequestEditor } from "@/components/RequestEditor";
 import { SaveRequestDialog } from "@/components/SaveRequestDialog";
+import { VariablesPanel } from "@/components/VariablesPanel";
 import { RequestVariablesTabs } from "@/components/RequestVariablesTabs";
 import { ResponseContainer } from "@/components/ResponseContainer";
 
@@ -240,15 +243,18 @@ function App() {
 
   // A drag-to-open sidebar (rather than a click toggle) for browsing many
   // environments at once. Matches Postman's feel: a short pull past a small
-  // threshold snaps straight to the constant open width (not a continuous
-  // pixel-by-pixel resize), and pulling back the other way snaps it shut.
-  const [sidebarWidth, setSidebarWidth] = useState(0);
+  // threshold snaps straight open (not a continuous pixel-by-pixel resize),
+  // and pulling back the other way snaps it shut. Tracked as open/closed
+  // rather than a computed pixel width — the actual width is a live `vw`
+  // Tailwind class (see Sidebar.tsx), so it stays in sync with the window
+  // size on its own instead of going stale the moment the window is resized
+  // again without re-dragging the handle.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleSidebarHandlePointerDown(e: React.PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const wasOpen = sidebarWidth > 0;
-    const openWidth = window.innerWidth * 0.16;
+    const wasOpen = sidebarOpen;
     const threshold = 48;
     let toggled = false;
 
@@ -256,10 +262,10 @@ function App() {
       if (toggled) return;
       const delta = moveEvent.clientX - startX;
       if (!wasOpen && delta > threshold) {
-        setSidebarWidth(openWidth);
+        setSidebarOpen(true);
         toggled = true;
       } else if (wasOpen && delta < -threshold) {
-        setSidebarWidth(0);
+        setSidebarOpen(false);
         toggled = true;
       }
     }
@@ -524,6 +530,24 @@ function App() {
     [editingEnvironmentId]
   );
 
+  // Edits a variable's value straight from the {{var}} hover popup, by name,
+  // in whichever environment is active — deliberately independent of
+  // `editingEnvironmentId` above, since the popup can be used whether or not
+  // the Environment editor dialog happens to be open.
+  const updateActiveEnvironmentVariable = useCallback(
+    (name: string, value: string) => {
+      if (activeEnvironmentId === null) return;
+      setEnvironments((prev) =>
+        prev.map((e) =>
+          e.id === activeEnvironmentId
+            ? { ...e, variables: e.variables.map((v) => (v.key === name ? { ...v, value } : v)) }
+            : e
+        )
+      );
+    },
+    [activeEnvironmentId]
+  );
+
   // Restore tabs left open from the previous session, if any were saved,
   // including which tab and which sub-tab were last active.
   useEffect(() => {
@@ -762,38 +786,73 @@ function App() {
     [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body, activeEnvironment]
   );
 
+  // Drag-to-open, same mechanic as the left Sidebar (see
+  // handleSidebarHandlePointerDown) mirrored horizontally: dragging the
+  // handle left past the threshold opens it, dragging right past the
+  // threshold (while open) closes it.
+  const [variablesPanelOpen, setVariablesPanelOpen] = useState(false);
+
+  function handleVariablesPanelHandlePointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const wasOpen = variablesPanelOpen;
+    const threshold = 48;
+    let toggled = false;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      if (toggled) return;
+      const delta = moveEvent.clientX - startX;
+      if (!wasOpen && delta < -threshold) {
+        setVariablesPanelOpen(true);
+        toggled = true;
+      } else if (wasOpen && delta > threshold) {
+        setVariablesPanelOpen(false);
+        toggled = true;
+      }
+    }
+    function handlePointerUp() {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+    }
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+  }
+
+  // A live-resizing window with a docked panel open looks jarring (text
+  // rewrapping, the cURL block reflowing) — simplest is to just close
+  // whichever panel is open rather than trying to animate through it.
+  useEffect(() => {
+    function handleWindowResize() {
+      setSidebarOpen(false);
+      setVariablesPanelOpen(false);
+    }
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, []);
+
+  const requestVariableNames = useMemo(
+    () =>
+      findAllVariableNames([
+        activeRequest.url,
+        ...activeRequest.params.map((p) => p.value),
+        ...activeRequest.headers.map((h) => h.value),
+        activeRequest.body,
+      ]),
+    [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body]
+  );
+  const curlCommand = useMemo(() => {
+    const { method, url, headers, body } = buildOutgoingRequest(activeRequest, activeEnvironment);
+    return buildCurlCommand(method, url, headers, body);
+  }, [activeRequest, activeEnvironment]);
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
-    const { method, url, params, headers, body } = activeRequest;
-    const requestUrl = buildRequestUrl(
-      substituteVariables(url, activeEnvironment),
-      params.map((p) => ({ ...p, value: substituteVariables(p.value, activeEnvironment) }))
-    );
-    const requestHeaders = headers
-      .filter(({ key, enabled }) => enabled && key.trim() !== "")
-      .map(({ key, value }) => [key, substituteVariables(value, activeEnvironment)] as [string, string]);
-
-    const substitutedBody = substituteVariables(stripJsonComments(body), activeEnvironment);
-    const trimmedBody = substitutedBody.trim();
-    const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
-    if (trimmedBody !== "" && !hasContentType) {
-      requestHeaders.push(["Content-Type", "application/json"]);
-    }
-    for (const { key, value } of DEFAULT_HEADERS) {
-      if (!requestHeaders.some(([k]) => k.toLowerCase() === key.toLowerCase())) {
-        requestHeaders.push([key, value]);
-      }
-    }
+    const { method, url, headers, body } = buildOutgoingRequest(activeRequest, activeEnvironment);
 
     updateActiveRequest({ error: null, response: null, isSending: true });
     try {
-      const result = await invoke<HttpResponse>("send_request", {
-        method,
-        url: requestUrl,
-        headers: requestHeaders,
-        body: trimmedBody === "" ? null : substitutedBody,
-      });
+      const result = await invoke<HttpResponse>("send_request", { method, url, headers, body });
       updateActiveRequest({ response: result, isSending: false });
     } catch (err) {
       updateActiveRequest({ error: String(err), isSending: false });
@@ -826,7 +885,7 @@ function App() {
         </AlertDialogContent>
       </AlertDialog>
       <Sidebar
-        sidebarWidth={sidebarWidth}
+        sidebarOpen={sidebarOpen}
         onHandlePointerDown={handleSidebarHandlePointerDown}
         environments={environments}
         activeEnvironmentId={activeEnvironmentId}
@@ -852,8 +911,11 @@ function App() {
       />
 
       <main
-        className="flex h-screen flex-col gap-5 overflow-hidden p-8 transition-[margin-left] duration-150"
-        style={{ marginLeft: sidebarWidth }}
+        className={cn(
+          "flex h-screen flex-col gap-5 overflow-hidden p-6 transition-[margin-left,margin-right] duration-150",
+          sidebarOpen ? "ml-[max(16vw,180px)]" : "ml-0",
+          variablesPanelOpen ? "mr-[max(16vw,280px)]" : "mr-0"
+        )}
       >
       <div className="flex shrink-0 flex-col gap-3">
         <TabBar
@@ -891,6 +953,10 @@ function App() {
           unresolvedVariables={unresolvedVariables}
           onSave={handleSaveActiveRequest}
           onSaveAs={handleSaveActiveRequestAs}
+          activeEnvironment={activeEnvironment}
+          onUpdateEnvironmentVariable={updateActiveEnvironmentVariable}
+          onOpenEnvironment={() => activeEnvironmentId && openEnvironmentEditor(activeEnvironmentId)}
+          onOpenVariablesPanel={() => setVariablesPanelOpen(true)}
         />
       </div>
 
@@ -917,6 +983,16 @@ function App() {
       defaultName={activeRequest.name}
       onAddCollection={handleAddCollection}
       onConfirm={handleConfirmSaveTo}
+    />
+
+    <VariablesPanel
+      open={variablesPanelOpen}
+      onClose={() => setVariablesPanelOpen(false)}
+      onHandlePointerDown={handleVariablesPanelHandlePointerDown}
+      variableNames={requestVariableNames}
+      environment={activeEnvironment}
+      onUpdateVariable={updateActiveEnvironmentVariable}
+      curlCommand={curlCommand}
     />
     </>
   );

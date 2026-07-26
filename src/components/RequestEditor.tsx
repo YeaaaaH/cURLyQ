@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -7,10 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Save } from "lucide-react";
+import { ChevronDown, Copy, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HTTP_METHODS } from "@/lib/http";
+import { HTTP_METHODS, METHOD_COLORS } from "@/lib/http";
+import type { Environment } from "@/lib/environments";
 import { SUB_TABS, type RequestTab } from "@/lib/requestTabs";
+import { VariableAwareInput } from "@/components/VariableAwareInput";
 
 export function RequestEditor({
   activeRequest,
@@ -24,6 +32,10 @@ export function RequestEditor({
   unresolvedVariables,
   onSave,
   onSaveAs,
+  activeEnvironment,
+  onUpdateEnvironmentVariable,
+  onOpenEnvironment,
+  onOpenVariablesPanel,
 }: {
   activeRequest: RequestTab;
   onUpdate: (patch: Partial<RequestTab>) => void;
@@ -36,18 +48,43 @@ export function RequestEditor({
   unresolvedVariables: string[];
   onSave: () => void;
   onSaveAs: () => void;
+  activeEnvironment: Environment | null;
+  onUpdateEnvironmentVariable: (name: string, value: string) => void;
+  onOpenEnvironment: () => void;
+  onOpenVariablesPanel: () => void;
 }) {
   return (
     <>
-      <input
-        type="text"
-        value={activeRequest.name}
-        onChange={(e) => onUpdate({ name: e.target.value })}
-        onBlur={onCommitName}
-        placeholder="Untitled request"
-        aria-label="Request name"
-        className="w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={activeRequest.name}
+          onChange={(e) => onUpdate({ name: e.target.value })}
+          onBlur={onCommitName}
+          placeholder="Untitled request"
+          aria-label="Request name"
+          className="w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
+        />
+        <ButtonGroup className="shrink-0">
+          <Button type="button" variant="outline" onClick={onSave} title="Save (Ctrl+S)">
+            <Save />
+            Save
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="icon" aria-label="Save options">
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onSaveAs}>
+                <Copy />
+                Save as...
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ButtonGroup>
+      </div>
 
       <form className="flex flex-col gap-1.5" onSubmit={onSend}>
         <div className="flex gap-2">
@@ -55,45 +92,28 @@ export function RequestEditor({
             value={activeRequest.method}
             onValueChange={onUpdateMethod}
           >
-            <SelectTrigger className="w-28 font-semibold">
+            <SelectTrigger className={cn("w-28 font-semibold", METHOD_COLORS[activeRequest.method])}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {HTTP_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>
+                <SelectItem key={m} value={m} className={cn("font-semibold", METHOD_COLORS[m])}>
                   {m}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Input
-            className="font-mono aria-invalid:border-destructive"
-            type="text"
+          <VariableAwareInput
+            className="font-mono"
             value={activeRequest.url}
-            onChange={(e) => onUrlChange(e.target.value)}
+            onChange={onUrlChange}
+            environment={activeEnvironment}
+            onUpdateVariable={onUpdateEnvironmentVariable}
+            onOpenEnvironment={onOpenEnvironment}
+            onOpenVariablesPanel={onOpenVariablesPanel}
             placeholder="https://example.com"
-            aria-invalid={urlError !== null}
+            ariaInvalid={urlError !== null}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={onSave}
-            aria-label="Save request"
-            title="Save (Ctrl+S)"
-          >
-            <Save />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={onSaveAs}
-            aria-label="Save request as..."
-            title="Save as..."
-          >
-            <Copy />
-          </Button>
           <Button type="submit" className="w-24" disabled={activeRequest.isSending || !canSend}>
             {activeRequest.isSending ? "Sending…" : "Send"}
           </Button>
