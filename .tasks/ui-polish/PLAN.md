@@ -18,10 +18,7 @@ Design decisions already made with the user:
 - **Collections** support nested folders, not just a flat list.
 - **Import/export** targets Postman v2.1 collection/environment JSON format.
 
-### Item 7: Collections (nested folders) — mostly done, see `.tasks/collections/PLAN.md`
-
-Only Step B3 (save gesture) remains there.
-
+### Item 7: Collections (nested folders) — DONE, see `.tasks/done/collections.md`
 ### Item 8: Pre-request / post-response scripts — not started
 ### Item 9: Import (Postman v2.1 → cURLyQ) — DONE, see `.tasks/import-export/PLAN.md`
 ### Item 10: Export (cURLyQ → Postman v2.1) — DONE, see `.tasks/import-export/PLAN.md`

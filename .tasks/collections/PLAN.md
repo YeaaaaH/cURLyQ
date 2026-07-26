@@ -1,65 +1,15 @@
 # Collections — Plan
 
-Two phases: (A) split `App.tsx` into domain-based modules/components first, since it's
-grown to 1237 lines with everything — types, utils, and a ~660-line `App()` — in one
-file; (B) build Postman-style nested-folder collections on top of the cleaner
-structure. Update this file as steps complete or requirements change.
+Phase A, Phase B, and Step B3 (save gesture) are all done — see
+`.tasks/done/collections.md`. This file now only tracks what's explicitly deferred or
+not yet scheduled.
 
-Phase A and most of Phase B (Rust persistence, sidebar tree UI, rename/delete/move,
-drag-and-drop) are done — see `.tasks/done/collections.md`. Remaining work: Step B3
-(save gesture), below.
-
-## Decisions made so far
-
-- **Nested folders, Postman-style** — a collection is a tree (folders can contain
-  folders and requests), not just a flat list of requests.
-- **Save behavior is a live link** — a tab opened from a saved request remembers
-  where it came from (`sourceRequestId`/`sourceCollectionId`) and "Save" updates that
-  request in place, matching real Postman muscle memory. "Save as" still forks a copy.
-- The sidebar already has a "Collections" placeholder Collapsible
-  (`No collections yet.`) next to Environments — Phase B replaces its content, not its
-  position/structure.
-- `project_specs.md` currently lists collections/folders as explicitly out of scope
-  for v1 — update it once Phase B starts so the doc doesn't contradict what's built.
-
-## Phase B: Collections (Postman-style, nested folders)
-
-### Data model
-
-- `CollectionNode` — discriminated union:
-  - Folder: `{ type: "folder", id, name, items: CollectionNode[] }`
-  - Saved request: `{ type: "request", id, name, method, url, params, headers, body }`
-- `Collection` — `{ id, name, items: CollectionNode[] }` (the root container — a
-  named tree of folders/requests).
-- `RequestTab` gains `sourceRequestId: string | null` and `sourceCollectionId: string
-  | null`, so an opened saved request can be saved back in place.
-
-### Step B3: Save gesture
-
-- Save button/shortcut (e.g. Ctrl+S) on the active tab:
-  - If the tab has a `sourceRequestId`, update that request in place.
-  - Otherwise (a fresh "Untitled request" tab), open a "Save to..." picker: choose an
-    existing collection/folder or create a new one, prompt for a name.
-- "Save as" (secondary action) always opens the picker, even for tabs with a source —
-  lets you fork a copy.
-
-**Method live-sync — DONE (2026-07-25).** Found while testing: a source-linked
-tab's method changes weren't propagating back to the collection at all — only the
-*name* had that. Resolved by extending the same one-directional live-sync pattern
-to method: `updateCollectionRequestMethod` (`src/lib/collections.ts`, mirrors
-`renameCollectionNode`) + `handleUpdateMethod` (`App.tsx`), wired to the method
-`<Select>`'s `onValueChange` in `RequestEditor.tsx`. No blur-debounce needed here
-(unlike the name) — a `<Select>` pick is already one discrete event, not a
-keystroke stream, so there's no per-character re-render risk to guard against.
-url/headers/body/params still don't sync anywhere — still waiting on the real
-Save gesture above.
-
-### Explicitly deferred (unless scope changes)
+## Explicitly deferred (unless scope changes)
 
 - Import/export (Postman collection JSON format compatibility).
 - Duplicating a request/folder.
 
-### Noted, not scheduled
+## Noted, not scheduled
 
 - The Request Body tab's overall approach (plain `<textarea>`, no syntax
   highlighting/formatting/validation beyond the existing non-blocking "invalid
@@ -69,3 +19,7 @@ Save gesture above.
   it and held there (hover-to-expand) isn't built — reaching a spot inside a
   collapsed container during a drag currently requires expanding it by hand
   first.
+- `SaveRequestDialog`'s tree picker has no create-folder affordance of its own —
+  if that turns out to matter in practice, revisit alongside a proper name-prompt
+  flow (matching the sidebar's inline-rename convention) rather than the
+  auto-named "New Collection" quick-create it has now.

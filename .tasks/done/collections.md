@@ -1,8 +1,8 @@
 # Collections — Done
 
-Phase A (App.tsx refactor) and most of Phase B (Rust persistence, sidebar tree UI,
-rename/delete/move, drag-and-drop). Remaining work (Step B3: save gesture) is still
-tracked in `.tasks/collections/PLAN.md`.
+Phase A (App.tsx refactor) and all of Phase B (Rust persistence, sidebar tree UI,
+rename/delete/move, drag-and-drop, save gesture) are done. Any still-open backlog
+items are tracked in `.tasks/collections/PLAN.md`.
 
 ## Phase A: Refactor `App.tsx` (no behavior change) — DONE, 1237 → 414 lines
 
@@ -101,6 +101,56 @@ Added `@dnd-kit/core` + `@dnd-kit/utilities` (no prior DnD lib in the project).
   (previously one shared wrapper scrolled everything together): only the Response Body
   scrolls, Status/Response Headers stay pinned. Both now use the shared `Card`
   component instead of a hand-styled `<div>`.
+
+## Step B3: Save gesture — DONE (2026-07-26)
+
+- `updateCollectionRequestFields` (`lib/collections.ts`) — writes a request node's
+  full editable field set (name/method/url/params/headers/body) back into the tree in
+  one shot, unlike the narrow single-field live-sync helpers (name-on-blur,
+  method-on-change) that already existed. Used by the explicit Save gesture, which
+  needs to sync everything at once.
+- `handleSaveActiveRequest` (`App.tsx`), wired to both a Save button and a
+  document-level Ctrl+S/Cmd+S listener: updates the source request in place if the
+  active tab has `sourceRequestId`/`sourceCollectionId`; otherwise opens the "Save
+  to..." picker (a tab with nowhere to save yet).
+- `handleSaveActiveRequestAs` — always opens the picker regardless of source, and
+  `handleConfirmSaveTo` always creates a *new* request node and re-points the active
+  tab at it — this is what gives "Save as" its fork behavior (the original,
+  previously-linked request is left untouched).
+- `SaveRequestDialog.tsx` (new) — name input + a collection/folder tree picker
+  (folders only; individual requests aren't valid save targets so they're filtered
+  out of the tree entirely) with expand/collapse, single-selection highlighting, and
+  a "New collection" quick-create button that adds and auto-selects. No
+  create-folder-from-the-dialog affordance in this pass — creating one via the
+  sidebar first and picking it here covers that case.
+- `RequestEditor.tsx` — Save (disk icon) and Save As (copy icon) buttons added next
+  to Send, both always enabled now that a destination-less tab has somewhere to go.
+
+### Related fix found during testing: default request headers
+
+Sending to `https://httpbingo.org/anything` (via a `{{baseUrl}}` env var) came back a
+bare 402 with no body, while the identical request worked fine from a browser.
+Root-caused with plain `curl`: httpbingo.org (hosted on Fly.io) rejects any request
+without a `User-Agent` header — browsers always send one; `reqwest::Client::new()` on
+the Rust side does not unless told to. Initially fixed backend-side, then moved
+frontend-side per user preference (Rust should just receive whatever headers it's
+given, not special-case any of them):
+
+- `DEFAULT_HEADERS` (`lib/http.ts`) — currently just `User-Agent: cURLyQ/0.1.0`.
+  Injected in `handleSend` right before the request goes out, same
+  only-if-not-already-set pattern as the existing conditional `Content-Type` default.
+- `KeyValueEditor.tsx` gained a `lockedRows` prop — read-only rows (checked+disabled
+  checkbox, disabled inputs, no delete button) rendered above the editable ones, for
+  showing "this is being sent automatically" without it being part of persisted data.
+- `RequestVariablesTabs.tsx`'s `unmatchedDefaultHeaders` filters `DEFAULT_HEADERS`
+  down to whichever aren't already covered by one of the user's own header rows
+  (case-insensitive key match) — a locked row disappears the moment the user adds
+  their own header with that same key, since theirs wins.
+- Styling gotcha: the locked row's own `opacity-50` wrapper stacked with `Input`'s
+  `disabled:opacity-50`, compounding to ~25% and reading as nearly invisible. Fixed by
+  dropping the wrapper opacity and relying on the input's normal disabled styling
+  alone (still `opacity-70` on the checkbox specifically, since it has no built-in
+  disabled dimming of its own).
 
 ## Explicitly deferred (unless scope changes)
 
