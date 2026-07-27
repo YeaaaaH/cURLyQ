@@ -1,7 +1,8 @@
 import { type KeyValuePair, ensureTrailingBlankRow, stripEmptyRows } from "@/lib/keyValue";
-import { type Environment, VARIABLE_PATTERN, substituteVariables } from "@/lib/environments";
-import { DEFAULT_HEADERS, type HttpResponse } from "@/lib/http";
-import { buildRequestUrl } from "@/lib/requestUrl";
+import type { HttpResponse } from "@/lib/http";
+import type { VariableLookup } from "@/lib/variables/context";
+import { VARIABLE_PATTERN } from "@/lib/variables/tokenizer";
+import { substituteVariables } from "@/lib/variables/resolver";
 
 export type SubTab = "params" | "headers" | "body";
 
@@ -112,17 +113,17 @@ export function statusVariant(status: number): "default" | "secondary" | "destru
   return "destructive";
 }
 
-export function getUrlError(url: string, environment: Environment | null): string | null {
+export function getUrlError(url: string, context: VariableLookup): string | null {
   const trimmed = url.trim();
   if (trimmed === "") return null;
-  const substituted = substituteVariables(trimmed, environment);
+  const substituted = substituteVariables(trimmed, context);
 
   // A template URL (e.g. {{baseUrl}}/path, or even just http://{{host}}/path)
   // may still contain an unresolved {{var}} if no environment is active or
   // the variable isn't defined there — `new URL()` throws on the literal
   // `{`/`}` characters even though the URL is perfectly valid once resolved.
   // Fall back to a plain prefix check instead of full parsing in that case.
-  // (Variable names aren't limited to \w — see environments.ts's
+  // (Variable names aren't limited to \w — see tokenizer.ts's
   // VARIABLE_PATTERN; matched here without the `g` flag since this is a
   // one-shot `.test()`, not an iteration.)
   if (/\{\{\s*[\w.-]+\s*\}\}/.test(substituted)) {
@@ -191,16 +192,16 @@ export function stripJsonComments(text: string): string {
   return result;
 }
 
-export function getBodyError(body: string, environment: Environment | null): string | null {
+export function getBodyError(body: string, context: VariableLookup): string | null {
   if (body.trim() === "") return null;
-  // Resolve whatever the active environment can (so e.g. {{port}} used
+  // Resolve whatever the current context can (so e.g. {{port}} used
   // unquoted for a numeric value validates correctly once it substitutes to
   // real digits), then treat anything still unresolved — no active
   // environment, or the variable isn't defined there — as an opaque
   // placeholder for validation purposes only. Postman itself doesn't block
   // editing/sending over a {{var}} that hasn't resolved yet; it'll either
   // resolve by send time or the server will complain, not the editor.
-  const withPlaceholders = substituteVariables(stripJsonComments(body), environment).replace(
+  const withPlaceholders = substituteVariables(stripJsonComments(body), context).replace(
     VARIABLE_PATTERN,
     "null"
   );
@@ -210,52 +211,4 @@ export function getBodyError(body: string, environment: Environment | null): str
   } catch {
     return "Body is not valid JSON";
   }
-}
-
-export interface OutgoingRequest {
-  method: string;
-  url: string;
-  headers: [string, string][];
-  body: string | null;
-}
-
-// Everything actually sent over the wire for `request` — variables
-// substituted, params merged into the URL's query string, and the same
-// default-header rules (Content-Type if there's a body and none was set,
-// User-Agent if none was set) applied. Factored out of handleSend so the
-// "Variables in request" panel's cURL preview shows exactly what would go
-// out, rather than a second computation that could quietly drift from it.
-export function buildOutgoingRequest(request: RequestTab, environment: Environment | null): OutgoingRequest {
-  const { method, url, params, headers, body } = request;
-
-  let requestUrl: string;
-  try {
-    requestUrl = buildRequestUrl(
-      substituteVariables(url, environment),
-      params.map((p) => ({ ...p, value: substituteVariables(p.value, environment) }))
-    );
-  } catch {
-    // Not a valid absolute URL yet (mid-edit, or a template that hasn't
-    // resolved) — fall back to the substituted raw string so the preview
-    // still shows something close, instead of throwing during a render.
-    requestUrl = substituteVariables(url, environment);
-  }
-
-  const requestHeaders = headers
-    .filter(({ key, enabled }) => enabled && key.trim() !== "")
-    .map(({ key, value }) => [key, substituteVariables(value, environment)] as [string, string]);
-
-  const substitutedBody = substituteVariables(stripJsonComments(body), environment);
-  const trimmedBody = substitutedBody.trim();
-  const hasContentType = requestHeaders.some(([key]) => key.toLowerCase() === "content-type");
-  if (trimmedBody !== "" && !hasContentType) {
-    requestHeaders.push(["Content-Type", "application/json"]);
-  }
-  for (const { key, value } of DEFAULT_HEADERS) {
-    if (!requestHeaders.some(([k]) => k.toLowerCase() === key.toLowerCase())) {
-      requestHeaders.push([key, value]);
-    }
-  }
-
-  return { method, url: requestUrl, headers: requestHeaders, body: trimmedBody === "" ? null : substitutedBody };
 }

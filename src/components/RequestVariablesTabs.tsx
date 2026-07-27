@@ -1,8 +1,11 @@
 import { Card } from "@/components/ui/card";
 import type { KeyValuePair } from "@/lib/keyValue";
 import { DEFAULT_HEADERS } from "@/lib/http";
+import type { Environment } from "@/lib/environments";
+import type { VariableLookup } from "@/lib/variables";
 import type { RequestTab } from "@/lib/requestTabs";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
+import { VariableAwareTextarea } from "@/components/VariableAwareTextarea";
 
 // Which of DEFAULT_HEADERS aren't already covered by one of the user's own
 // header rows (case-insensitive, non-empty key) — those are shown as locked
@@ -22,6 +25,11 @@ export function RequestVariablesTabs({
   removeHeader,
   onBodyKeyDown,
   bodyError,
+  activeEnvironment,
+  variableContext,
+  onUpdateEnvironmentVariable,
+  onOpenEnvironment,
+  onOpenVariablesPanel,
 }: {
   activeRequest: RequestTab;
   onUpdate: (patch: Partial<RequestTab>) => void;
@@ -31,11 +39,29 @@ export function RequestVariablesTabs({
   removeHeader: (index: number) => void;
   onBodyKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   bodyError: string | null;
+  activeEnvironment: Environment | null;
+  variableContext: VariableLookup;
+  onUpdateEnvironmentVariable: (name: string, value: string) => void;
+  onOpenEnvironment: () => void;
+  onOpenVariablesPanel: () => void;
 }) {
+  const variableAware = {
+    environment: activeEnvironment,
+    variableContext,
+    onUpdateVariable: onUpdateEnvironmentVariable,
+    onOpenEnvironment,
+    onOpenVariablesPanel,
+  };
+
   return (
     <Card className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto rounded-lg border border-input p-3 text-sm text-muted-foreground ring-0">
       {activeRequest.activeSubTab === "params" && (
-        <KeyValueEditor rows={activeRequest.params} onUpdate={updateParam} onRemove={removeParam} />
+        <KeyValueEditor
+          rows={activeRequest.params}
+          onUpdate={updateParam}
+          onRemove={removeParam}
+          variableAware={variableAware}
+        />
       )}
       {activeRequest.activeSubTab === "headers" && (
         <KeyValueEditor
@@ -43,25 +69,23 @@ export function RequestVariablesTabs({
           onUpdate={updateHeader}
           onRemove={removeHeader}
           lockedRows={unmatchedDefaultHeaders(activeRequest.headers)}
+          variableAware={variableAware}
         />
       )}
       {activeRequest.activeSubTab === "body" && (
         <div className="flex h-full min-h-0 flex-col gap-1.5">
-          <textarea
-            className="scrollbar-thin min-h-0 w-full flex-1 resize-none overflow-y-auto font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/70 aria-invalid:ring-2 aria-invalid:ring-destructive"
+          <VariableAwareTextarea
+            className="font-mono text-sm"
             placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
             value={activeRequest.body}
-            onChange={(e) => onUpdate({ body: e.target.value })}
+            onChange={(value) => onUpdate({ body: value })}
             onKeyDown={onBodyKeyDown}
-            onMouseDown={(e) => {
-              if (e.detail < 3) return;
-              e.preventDefault();
-              e.currentTarget.select();
-            }}
-            aria-invalid={bodyError !== null}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
+            ariaInvalid={bodyError !== null}
+            environment={variableAware.environment}
+            variableContext={variableAware.variableContext}
+            onUpdateVariable={variableAware.onUpdateVariable}
+            onOpenEnvironment={variableAware.onOpenEnvironment}
+            onOpenVariablesPanel={variableAware.onOpenVariablesPanel}
           />
           {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
         </div>

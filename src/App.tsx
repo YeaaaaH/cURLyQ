@@ -25,11 +25,16 @@ import {
   type Environment,
   buildPostmanEnvironment,
   createEnvironment,
-  findAllVariableNames,
-  getUnresolvedVariables,
   nextEnvironmentName,
   parsePostmanEnvironment,
 } from "@/lib/environments";
+import {
+  createVariableContext,
+  environmentScope,
+  findAllVariableNames,
+  getUnresolvedVariables,
+  resolveRequest,
+} from "@/lib/variables";
 import { buildCurlCommand } from "@/lib/curl";
 import { PostmanImportError } from "@/lib/postman";
 import { parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
@@ -58,7 +63,6 @@ import type { HttpResponse } from "@/lib/http";
 import {
   type PersistedTabsFile,
   type RequestTab,
-  buildOutgoingRequest,
   createRequestTab,
   fromPersistedTab,
   getBodyError,
@@ -119,6 +123,14 @@ function App() {
   }, [activeEnvironmentId]);
 
   const activeEnvironment = environments.find((e) => e.id === activeEnvironmentId) ?? null;
+  // The one shared lookup every variable-consuming call below resolves
+  // against — wraps the active environment as a `VariableScope` so a future
+  // second scope (e.g. collection-level variables) only means adding another
+  // scope to this list, not touching every call site again.
+  const variableContext = useMemo(
+    () => createVariableContext([environmentScope(activeEnvironment)]),
+    [activeEnvironment]
+  );
 
   const [collections, setCollections] = useState<Collection[]>([]);
 
@@ -764,12 +776,12 @@ function App() {
 
   const isUrlEmpty = activeRequest.url.trim() === "";
   const urlError = useMemo(
-    () => getUrlError(activeRequest.url, activeEnvironment),
-    [activeRequest.url, activeEnvironment]
+    () => getUrlError(activeRequest.url, variableContext),
+    [activeRequest.url, variableContext]
   );
   const bodyError = useMemo(
-    () => getBodyError(activeRequest.body, activeEnvironment),
-    [activeRequest.body, activeEnvironment]
+    () => getBodyError(activeRequest.body, variableContext),
+    [activeRequest.body, variableContext]
   );
   const canSend = !isUrlEmpty && !urlError;
   const unresolvedVariables = useMemo(
@@ -781,9 +793,9 @@ function App() {
           ...activeRequest.headers.map((h) => h.value),
           activeRequest.body,
         ],
-        activeEnvironment
+        variableContext
       ),
-    [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body, activeEnvironment]
+    [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body, variableContext]
   );
 
   // Drag-to-open, same mechanic as the left Sidebar (see
@@ -841,14 +853,14 @@ function App() {
     [activeRequest.url, activeRequest.params, activeRequest.headers, activeRequest.body]
   );
   const curlCommand = useMemo(() => {
-    const { method, url, headers, body } = buildOutgoingRequest(activeRequest, activeEnvironment);
+    const { method, url, headers, body } = resolveRequest(activeRequest, variableContext);
     return buildCurlCommand(method, url, headers, body);
-  }, [activeRequest, activeEnvironment]);
+  }, [activeRequest, variableContext]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!canSend) return;
-    const { method, url, headers, body } = buildOutgoingRequest(activeRequest, activeEnvironment);
+    const { method, url, headers, body } = resolveRequest(activeRequest, variableContext);
 
     updateActiveRequest({ error: null, response: null, isSending: true });
     try {
@@ -857,6 +869,16 @@ function App() {
     } catch (err) {
       updateActiveRequest({ error: String(err), isSending: false });
     }
+  }
+
+  // Shared by every variable-aware field (URL, and — from Stage 3 —
+  // header/param values) so each one jumps to the same place instead of
+  // each needing its own inline closure.
+  function handleOpenEnvironment() {
+    if (activeEnvironmentId) openEnvironmentEditor(activeEnvironmentId);
+  }
+  function handleOpenVariablesPanel() {
+    setVariablesPanelOpen(true);
   }
 
   return (
@@ -954,9 +976,10 @@ function App() {
           onSave={handleSaveActiveRequest}
           onSaveAs={handleSaveActiveRequestAs}
           activeEnvironment={activeEnvironment}
+          variableContext={variableContext}
           onUpdateEnvironmentVariable={updateActiveEnvironmentVariable}
-          onOpenEnvironment={() => activeEnvironmentId && openEnvironmentEditor(activeEnvironmentId)}
-          onOpenVariablesPanel={() => setVariablesPanelOpen(true)}
+          onOpenEnvironment={handleOpenEnvironment}
+          onOpenVariablesPanel={handleOpenVariablesPanel}
         />
       </div>
 
@@ -970,6 +993,11 @@ function App() {
           removeHeader={removeHeader}
           onBodyKeyDown={handleBodyKeyDown}
           bodyError={bodyError}
+          activeEnvironment={activeEnvironment}
+          variableContext={variableContext}
+          onUpdateEnvironmentVariable={updateActiveEnvironmentVariable}
+          onOpenEnvironment={handleOpenEnvironment}
+          onOpenVariablesPanel={handleOpenVariablesPanel}
         />
 
         <ResponseContainer error={activeRequest.error} response={activeRequest.response} />
@@ -990,7 +1018,7 @@ function App() {
       onClose={() => setVariablesPanelOpen(false)}
       onHandlePointerDown={handleVariablesPanelHandlePointerDown}
       variableNames={requestVariableNames}
-      environment={activeEnvironment}
+      variableContext={variableContext}
       onUpdateVariable={updateActiveEnvironmentVariable}
       curlCommand={curlCommand}
     />

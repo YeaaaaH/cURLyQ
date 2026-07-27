@@ -23,26 +23,12 @@ Design decisions already made with the user:
 ### Item 9: Import (Postman v2.1 → cURLyQ) — DONE, see `.tasks/import-export/PLAN.md`
 ### Item 10: Export (cURLyQ → Postman v2.1) — DONE, see `.tasks/import-export/PLAN.md`
 
-### Item 11: Color `{{var}}` tokens by resolution state — not started
+### Item 11: Color `{{var}}` tokens by resolution state — DONE, see `.tasks/variable-engine/PLAN.md`
 
-Raised while debugging a stray-quote-character bug in the Params/Headers key field
-(turned out to be Windows/WebView2 text suggestions on a field missing
-`autoComplete="off"`, fixed separately). While investigating, the user asked for a
-real feature: any `{{varName}}` token typed into Params/Headers/URL/Body should be
-visually colored — red if it doesn't resolve against the active environment, light
-blue if it does. `getUnresolvedVariables`/`findVariableNames` (in
-`src/lib/environments.ts` after the Phase A refactor) already contain the resolution
-logic needed; this would need a syntax-highlighting-style overlay or rich-text input
-since plain `<input>`/`<textarea>` can't color substrings of their own value.
-
-**Extended scope (added 2026-07-25)**: on top of the coloring, hovering a `{{name}}`
-token should open a small popup showing its resolved value (or an "unresolved" state
-if nothing matches). Detection reuses the same `{{name}}` pattern — now
-`VARIABLE_PATTERN` in `src/lib/environments.ts` (exported when the hyphen/dot fix
-landed) rather than \w-only. Since this needs to know each token's on-screen
-position to anchor a popup, it likely needs the same rich-text/overlay approach as
-the coloring itself, not a separate mechanism — worth building both together rather
-than the coloring first and retrofitting hover after.
+Grew from "color the tokens" into a full shared variable engine (range-based
+tokenizer, recursive resolver with cycle detection, one overlay-based
+`VariableAwareInput`/`VariableAwareTextarea` component pair replacing native inputs
+across URL/Params/Headers/Body) — tracked and completed in its own plan doc.
 
 ### Item 12: Colorize the method dropdown in the URL bar — not started
 

@@ -17,6 +17,7 @@ import { ChevronDown, Copy, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HTTP_METHODS, METHOD_COLORS } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
+import type { VariableLookup } from "@/lib/variables";
 import { SUB_TABS, type RequestTab } from "@/lib/requestTabs";
 import { VariableAwareInput } from "@/components/VariableAwareInput";
 
@@ -33,6 +34,7 @@ export function RequestEditor({
   onSave,
   onSaveAs,
   activeEnvironment,
+  variableContext,
   onUpdateEnvironmentVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
@@ -49,6 +51,7 @@ export function RequestEditor({
   onSave: () => void;
   onSaveAs: () => void;
   activeEnvironment: Environment | null;
+  variableContext: VariableLookup;
   onUpdateEnvironmentVariable: (name: string, value: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
@@ -108,6 +111,7 @@ export function RequestEditor({
             value={activeRequest.url}
             onChange={onUrlChange}
             environment={activeEnvironment}
+            variableContext={variableContext}
             onUpdateVariable={onUpdateEnvironmentVariable}
             onOpenEnvironment={onOpenEnvironment}
             onOpenVariablesPanel={onOpenVariablesPanel}

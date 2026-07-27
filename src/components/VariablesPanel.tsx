@@ -3,7 +3,7 @@ import { Copy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { type Environment, resolveVariable } from "@/lib/environments";
+import { type VariableLookup, resolveVariable, tokenizeVariables } from "@/lib/variables";
 
 const TABS = [
   { id: "variables", label: "Variables" },
@@ -16,7 +16,7 @@ export function VariablesPanel({
   onClose,
   onHandlePointerDown,
   variableNames,
-  environment,
+  variableContext,
   onUpdateVariable,
   curlCommand,
 }: {
@@ -24,7 +24,7 @@ export function VariablesPanel({
   onClose: () => void;
   onHandlePointerDown: (e: React.PointerEvent) => void;
   variableNames: string[];
-  environment: Environment | null;
+  variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
   curlCommand: string;
 }) {
@@ -74,7 +74,12 @@ export function VariablesPanel({
                 <p className="text-sm text-muted-foreground">No variables used in this request.</p>
               ) : (
                 variableNames.map((name) => {
-                  const resolved = resolveVariable(name, environment);
+                  const resolution = resolveVariable(name, variableContext);
+                  // Same rule as the hover popup: only editable when the raw
+                  // value is a direct literal, so editing here can't silently
+                  // flatten a {{nested}} reference into a literal.
+                  const rawValue = variableContext.lookup(name);
+                  const isDirectValue = rawValue !== undefined && tokenizeVariables(rawValue).length === 0;
                   return (
                     <div key={name} className="flex items-center gap-2">
                       <span
@@ -83,17 +88,25 @@ export function VariablesPanel({
                       >
                         {name}
                       </span>
-                      {resolved !== null ? (
+                      {resolution.kind === "unresolved" ? (
+                        <span className="text-sm text-destructive">unresolved</span>
+                      ) : resolution.kind === "circular" ? (
+                        <span className="text-sm text-destructive">
+                          {resolution.chain.join(" → ")} — circular reference
+                        </span>
+                      ) : isDirectValue ? (
                         <Input
                           className="h-8 min-w-0 flex-1 font-mono text-sm"
-                          value={resolved}
+                          value={resolution.value}
                           onChange={(e) => onUpdateVariable(name, e.target.value)}
                           autoComplete="off"
                           autoCorrect="off"
                           spellCheck={false}
                         />
                       ) : (
-                        <span className="text-sm text-destructive">unresolved</span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-sm" title={resolution.value}>
+                          {resolution.value}
+                        </span>
                       )}
                     </div>
                   );

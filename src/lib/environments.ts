@@ -44,64 +44,6 @@ export function nextEnvironmentName(existing: Environment[]): string {
   }
 }
 
-// Replaces {{varName}} with the matching enabled variable's value from the
-// active environment. Unresolved placeholders (no active environment, or no
-// matching enabled variable) are left as-is — substitution only ever happens
-// on a copy used for validation/sending, never written back into state, so
-// the raw {{varName}} stays visible and editable in the UI.
-// Variable names aren't limited to \w — Postman-style keys commonly use
-// kebab-case (e.g. {{api-gateway}}) or dotted namespacing (e.g.
-// {{service.host}}), neither of which \w alone matches.
-export const VARIABLE_PATTERN = /\{\{\s*([\w.-]+)\s*\}\}/g;
-
-export function substituteVariables(text: string, environment: Environment | null): string {
-  if (!environment) return text;
-  return text.replace(VARIABLE_PATTERN, (placeholder, name) => {
-    const variable = environment.variables.find((v) => v.enabled && v.key === name);
-    return variable ? variable.value : placeholder;
-  });
-}
-
-export function findVariableNames(text: string): string[] {
-  return [...text.matchAll(VARIABLE_PATTERN)].map((m) => m[1]);
-}
-
-// The resolved value for a single {{name}}, or null if nothing in the active
-// environment matches — used by the {{var}} highlighting/hover popup to show
-// what a token actually resolves to (or that it doesn't).
-export function resolveVariable(name: string, environment: Environment | null): string | null {
-  const variable = environment?.variables.find((v) => v.enabled && v.key === name);
-  return variable ? variable.value : null;
-}
-
-// Scans the given texts for {{varName}} placeholders that wouldn't resolve
-// against the active environment, for a non-blocking UI hint.
-export function getUnresolvedVariables(texts: string[], environment: Environment | null): string[] {
-  const resolvedKeys = new Set(
-    (environment?.variables ?? [])
-      .filter((v) => v.enabled && v.key.trim() !== "")
-      .map((v) => v.key)
-  );
-  const unresolved = new Set<string>();
-  for (const text of texts) {
-    for (const name of findVariableNames(text)) {
-      if (!resolvedKeys.has(name)) unresolved.add(name);
-    }
-  }
-  return [...unresolved];
-}
-
-// Every distinct {{varName}} used anywhere across the given texts (resolved
-// or not) — used by the "Variables in request" panel, which unlike
-// getUnresolvedVariables above needs the full set, not just the broken ones.
-export function findAllVariableNames(texts: string[]): string[] {
-  const names = new Set<string>();
-  for (const text of texts) {
-    for (const name of findVariableNames(text)) names.add(name);
-  }
-  return [...names];
-}
-
 // Reverse of parsePostmanEnvironment below — the exported file only needs to
 // be re-importable (by us or real Postman), not byte-identical to whatever
 // was originally imported, so this doesn't try to round-trip an `id` or any
