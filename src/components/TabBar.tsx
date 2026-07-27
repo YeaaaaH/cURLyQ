@@ -1,12 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
@@ -19,7 +13,7 @@ import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
 import { METHOD_COLORS } from "@/lib/http";
 import type { RequestTab } from "@/lib/requestTabs";
-import { EnvironmentEditor } from "@/components/EnvironmentEditor";
+import { EnvironmentsEditorPopup } from "@/components/EnvironmentsEditorPopup";
 
 export function TabBar({
   requests,
@@ -183,24 +177,19 @@ export function TabBar({
         </DropdownMenu>
       </div>
 
-      <Dialog open={environmentEditorOpen} onOpenChange={onEnvironmentEditorOpenChange}>
-        <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw]">
-          <DialogHeader>
-            <DialogTitle>Environments</DialogTitle>
-          </DialogHeader>
-          <EnvironmentEditor
-            environments={environments}
-            editingId={editingEnvironmentId}
-            onSelectEditing={onSelectEditingEnvironment}
-            onAdd={onAddEnvironment}
-            onRename={onRenameEnvironment}
-            onDelete={onDeleteEnvironment}
-            onExport={onExportEnvironment}
-            onUpdateVariable={onUpdateEnvironmentVariable}
-            onRemoveVariable={onRemoveEnvironmentVariable}
-          />
-        </DialogContent>
-      </Dialog>
+      <EnvironmentsEditorPopup
+        open={environmentEditorOpen}
+        onOpenChange={onEnvironmentEditorOpenChange}
+        environments={environments}
+        editingId={editingEnvironmentId}
+        onSelectEditing={onSelectEditingEnvironment}
+        onAdd={onAddEnvironment}
+        onRename={onRenameEnvironment}
+        onDelete={onDeleteEnvironment}
+        onExport={onExportEnvironment}
+        onUpdateVariable={onUpdateEnvironmentVariable}
+        onRemoveVariable={onRemoveEnvironmentVariable}
+      />
     </>
   );
 }
