@@ -958,6 +958,7 @@ function App() {
         />
 
         <RequestEditor
+          key={activeRequest.id}
           activeRequest={activeRequest}
           onUpdate={updateActiveRequest}
           onCommitName={handleCommitRequestName}
@@ -979,6 +980,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-5">
         <RequestVariablesTabs
+          key={activeRequest.id}
           activeRequest={activeRequest}
           onUpdate={updateActiveRequest}
           updateParam={updateParam}
