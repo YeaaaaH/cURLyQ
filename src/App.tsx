@@ -73,7 +73,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TabBar } from "@/components/tab-bar/TabBar";
 import { RequestEditor } from "@/components/request-editor/RequestEditor";
 import { VariablesPanel } from "@/components/variables-panel/VariablesPanel";
-import { RequestVariablesTabs } from "@/components/RequestVariablesTabs";
+import { RequestVariablesTabs } from "@/components/request-variables-tabs/RequestVariablesTabs";
 import { ResponseContainer } from "@/components/ResponseContainer";
 
 function App() {

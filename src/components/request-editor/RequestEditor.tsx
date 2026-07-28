@@ -5,7 +5,6 @@ import type { VariableLookup } from "@/lib/variables";
 import type { RequestTab } from "@/lib/requestTabs";
 import { RequestNameBar } from "./RequestNameBar";
 import { UrlBar } from "./UrlBar";
-import { SubTabSwitcher } from "./SubTabSwitcher";
 import { SaveRequestDialog } from "./SaveRequestDialog";
 
 interface RequestEditorProps {
@@ -113,11 +112,6 @@ export function RequestEditor({
         onUpdateEnvironmentVariable={onUpdateEnvironmentVariable}
         onOpenEnvironment={onOpenEnvironment}
         onOpenVariablesPanel={onOpenVariablesPanel}
-      />
-
-      <SubTabSwitcher
-        activeSubTab={activeRequest.activeSubTab}
-        onSelectSubTab={(tab) => onUpdate({ activeSubTab: tab })}
       />
 
       <SaveRequestDialog
