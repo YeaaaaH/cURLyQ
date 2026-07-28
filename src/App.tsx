@@ -70,7 +70,7 @@ import {
   toPersistedTab,
 } from "@/lib/requestTabs";
 import { Sidebar } from "@/components/sidebar/Sidebar";
-import { TabBar } from "@/components/TabBar";
+import { TabBar } from "@/components/tab-bar/TabBar";
 import { RequestEditor } from "@/components/RequestEditor";
 import { SaveRequestDialog } from "@/components/SaveRequestDialog";
 import { VariablesPanel } from "@/components/VariablesPanel";
@@ -700,11 +700,6 @@ function App() {
     }
   }
 
-  function handleTabsWheel(e: React.WheelEvent<HTMLDivElement>) {
-    if (e.deltaY === 0) return;
-    e.currentTarget.scrollLeft += e.deltaY;
-  }
-
   const updateParam = useCallback(
     (index: number, patch: Partial<KeyValuePair>) => {
       setRequests((prev) =>
@@ -946,7 +941,6 @@ function App() {
           onSelectTab={setActiveId}
           onCloseTab={handleCloseTab}
           onAddTab={handleAddTab}
-          onWheel={handleTabsWheel}
           environments={environments}
           activeEnvironmentId={activeEnvironmentId}
           onSelectEnvironment={setActiveEnvironmentId}
