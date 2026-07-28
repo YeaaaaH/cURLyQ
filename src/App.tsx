@@ -71,8 +71,7 @@ import {
 } from "@/lib/requestTabs";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TabBar } from "@/components/tab-bar/TabBar";
-import { RequestEditor } from "@/components/RequestEditor";
-import { SaveRequestDialog } from "@/components/SaveRequestDialog";
+import { RequestEditor } from "@/components/request-editor/RequestEditor";
 import { VariablesPanel } from "@/components/VariablesPanel";
 import { RequestVariablesTabs } from "@/components/RequestVariablesTabs";
 import { ResponseContainer } from "@/components/ResponseContainer";
@@ -614,17 +613,12 @@ function App() {
     }
   }
 
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-
-  // The explicit Save gesture (Ctrl+S / Save button). A tab already linked to
-  // a collection request updates that request in place; a fresh,
-  // never-saved tab has nowhere to save *to* yet, so it opens the "Save
-  // to..." picker instead.
-  function handleSaveActiveRequest() {
-    if (!activeRequest.sourceRequestId || !activeRequest.sourceCollectionId) {
-      setSaveDialogOpen(true);
-      return;
-    }
+  // Persists the active tab's current field values into the collection
+  // request it's already linked to. Only meaningful when a source exists —
+  // RequestEditor decides whether to call this or open the "Save to..."
+  // picker instead (a fresh, never-saved tab has nowhere to save *to* yet),
+  // since it already owns that picker's state.
+  function handleSaveActiveRequestInPlace() {
     setCollections((prev) =>
       updateCollectionRequestFields(prev, activeRequest.sourceCollectionId!, activeRequest.sourceRequestId!, {
         name: activeRequest.name,
@@ -635,12 +629,6 @@ function App() {
         body: activeRequest.body,
       })
     );
-  }
-
-  // "Save as" always opens the picker, even for a tab that already has a
-  // source — forking a copy rather than overwriting the linked request.
-  function handleSaveActiveRequestAs() {
-    setSaveDialogOpen(true);
   }
 
   // Confirming the "Save to..." picker always creates a brand-new request
@@ -660,21 +648,7 @@ function App() {
     };
     setCollections((prev) => addNodeToCollection(prev, collectionId, parentFolderId, node));
     updateActiveRequest({ name, sourceRequestId: node.id, sourceCollectionId: collectionId });
-    setSaveDialogOpen(false);
   }
-
-  // Ctrl+S (Cmd+S on macOS) saves the active tab from anywhere in the window,
-  // matching every other editor's muscle memory — without preventDefault the
-  // browser's native "Save page" dialog would fire instead.
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key.toLowerCase() !== "s" || !(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
-      handleSaveActiveRequest();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  });
 
   function handleAddTab() {
     const tab = createRequestTab();
@@ -968,8 +942,10 @@ function App() {
           canSend={canSend}
           urlError={urlError}
           unresolvedVariables={unresolvedVariables}
-          onSave={handleSaveActiveRequest}
-          onSaveAs={handleSaveActiveRequestAs}
+          onSaveInPlace={handleSaveActiveRequestInPlace}
+          collections={collections}
+          onAddCollection={handleAddCollection}
+          onConfirmSaveTo={handleConfirmSaveTo}
           activeEnvironment={activeEnvironment}
           variableContext={variableContext}
           onUpdateEnvironmentVariable={updateActiveEnvironmentVariable}
@@ -999,15 +975,6 @@ function App() {
         <ResponseContainer error={activeRequest.error} response={activeRequest.response} />
       </div>
     </main>
-
-    <SaveRequestDialog
-      open={saveDialogOpen}
-      onOpenChange={setSaveDialogOpen}
-      collections={collections}
-      defaultName={activeRequest.name}
-      onAddCollection={handleAddCollection}
-      onConfirm={handleConfirmSaveTo}
-    />
 
     <VariablesPanel
       open={variablesPanelOpen}

@@ -98,20 +98,23 @@ export function SaveRequestDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  collections: Collection[];
+  collections: readonly Collection[];
   defaultName: string;
   onAddCollection: () => string;
   onConfirm: (collectionId: string, parentFolderId: string | null, name: string) => void;
 }) {
   const [name, setName] = useState(defaultName);
   const [selected, setSelected] = useState<Target | null>(null);
+  const [openCollections, setOpenCollections] = useState<Record<string, boolean>>({});
 
-  // Reset the draft name and selection each time the dialog opens, rather
-  // than carrying over whatever was left from the last time it was used.
+  // Reset the draft name, selection, and expanded collections each time the
+  // dialog opens, rather than carrying over whatever was left from the last
+  // time it was used.
   useEffect(() => {
     if (open) {
       setName(defaultName);
       setSelected(null);
+      setOpenCollections({});
     }
   }, [open, defaultName]);
 
@@ -155,6 +158,7 @@ export function SaveRequestDialog({
             ) : (
               collections.map((collection) => {
                 const target: Target = { collectionId: collection.id, parentFolderId: null };
+                const isOpen = openCollections[collection.id] ?? false;
                 return (
                   <div key={collection.id} className="flex flex-col">
                     <button
@@ -165,16 +169,29 @@ export function SaveRequestDialog({
                         sameTarget(selected, target) ? "bg-accent text-foreground" : "text-muted-foreground"
                       )}
                     >
+                      <span
+                        role="button"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenCollections((prev) => ({ ...prev, [collection.id]: !isOpen }));
+                        }}
+                        className="flex shrink-0 items-center"
+                      >
+                        {isOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                      </span>
                       <Folder className="size-3.5 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{collection.name}</span>
                     </button>
-                    <FolderRows
-                      collectionId={collection.id}
-                      nodes={collection.items}
-                      depth={1}
-                      selected={selected}
-                      onSelect={setSelected}
-                    />
+                    {isOpen && (
+                      <FolderRows
+                        collectionId={collection.id}
+                        nodes={collection.items}
+                        depth={1}
+                        selected={selected}
+                        onSelect={setSelected}
+                      />
+                    )}
                   </div>
                 );
               })
