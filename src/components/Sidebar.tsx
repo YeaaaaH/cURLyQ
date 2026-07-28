@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
 import type { Collection, RequestNode } from "@/lib/collections";
 import { type ImportExportLogEntry, formatRelativeTime } from "@/lib/importExportLog";
-import { CollectionTree } from "@/components/CollectionTree";
+import { CollectionTree } from "@/components/collection-tree/CollectionTree";
 
 export function Sidebar({
   sidebarOpen,
