@@ -74,7 +74,7 @@ import { TabBar } from "@/components/tab-bar/TabBar";
 import { RequestEditor } from "@/components/request-editor/RequestEditor";
 import { VariablesPanel } from "@/components/variables-panel/VariablesPanel";
 import { RequestVariablesTabs } from "@/components/request-variables-tabs/RequestVariablesTabs";
-import { ResponseContainer } from "@/components/ResponseContainer";
+import { ResponseContainer } from "@/components/response-container/ResponseContainer";
 
 function App() {
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
