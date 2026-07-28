@@ -5,41 +5,25 @@ description: Commit and push the current working tree changes, following this re
 
 # Commit & Push
 
-Stages, commits, and pushes the current changes in one pass, matching how this
-repo's history is already written. Don't deviate from the conventions below
-without being explicitly asked to.
+Delegates the actual git work to the `committer` subagent
+(`.claude/agents/committer.md`), which runs on a cheaper model — staging,
+committing, and pushing is mostly mechanical, not reasoning-heavy, so it
+doesn't need the main conversation's model.
 
 ## Steps
 
-1. Run in parallel: `git status`, `git diff` (unstaged), `git diff --staged`
-   (already staged), and `git log --oneline -10`.
-2. Decide whether the pending changes are one cohesive change or several
-   unrelated ones. Prefer fewer commits when changes genuinely belong
-   together; split when they don't — e.g. a docs/plan reorganization is its
-   own commit, separate from the feature work it accompanies (see this repo's
-   history for precedent: the `.tasks` archive split was committed separately
-   from the import/export feature it was done alongside).
-3. For each logical group: stage the specific files by name (`git add
-   <files>`), then check `git status` / `git diff --staged` for anything that
-   shouldn't be committed — secrets, credentials, stray debug files, unrelated
-   edits mixed in.
-4. Write the commit message in this repo's established shape (spot-check
-   `git log -3 --format=full` if unsure it's still accurate):
-   - Subject line: imperative mood, under ~70 characters, no trailing period.
-   - Blank line, then 1-3 short paragraphs of prose explaining *why* and any
-     non-obvious decisions — not a bullet list restating *what* changed, since
-     the diff already shows that.
-   - Blank line, then `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`.
-   - Always pass the message via a heredoc (`git commit -m "$(cat <<'EOF' ... EOF)"`),
-     never a raw `-m "..."` string.
-5. Commit each group, then `git push` once every commit is made.
-6. Report back the pushed commit(s) — short hash and subject line — to the user.
+1. Write a short (1-4 sentence) summary of what changed in this session and
+   *why* — the context the `committer` agent needs to write an accurate
+   commit message body, since it starts with no memory of this conversation.
+   Describe what was actually done and the reasoning behind any non-obvious
+   decisions; don't just say "commit it."
+2. Invoke the `committer` subagent via the Agent tool (`subagent_type:
+   committer`, `run_in_background: false` — its result is needed before
+   reporting back) with that summary as the prompt.
+3. Relay its result (pushed commit hash(es) + subject line, or whatever it
+   reports) to the user.
 
-## Guardrails
-
-- Never `git add -A` or `git add .` — always stage files by name.
-- Never amend, force-push, or skip hooks (`--no-verify`/`--no-gpg-sign`) unless
-  the user explicitly asks for it in that specific invocation.
-- If there's nothing changed, say so rather than creating an empty commit.
-- If a pre-commit hook fails, fix the underlying issue and create a *new*
-  commit — never amend the one that failed.
+Do not perform the git steps yourself inline — that defeats the point of
+delegating to the cheaper model. The full git conventions (commit message
+shape, splitting logic, guardrails) live in `committer.md` itself, not here —
+don't duplicate them.
