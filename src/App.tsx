@@ -69,7 +69,7 @@ import {
   getUrlError,
   toPersistedTab,
 } from "@/lib/requestTabs";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import { RequestEditor } from "@/components/RequestEditor";
 import { SaveRequestDialog } from "@/components/SaveRequestDialog";

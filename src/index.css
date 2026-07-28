@@ -117,6 +117,12 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* App layout tokens — not part of the shadcn-generated theme above, same
+   value in light and dark. */
+:root {
+    --app-sidebar-width: max(16vw, 180px);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
