@@ -22,6 +22,9 @@ export const DEFAULT_HEADERS: { key: string; value: string }[] = [
 
 export interface HttpResponse {
   status: number;
-  headers: Record<string, string>;
+  // A tuple array (not Record<string, string>) so repeated header names —
+  // e.g. multiple Set-Cookie values — survive instead of the later one
+  // silently overwriting the earlier ones.
+  headers: [string, string][];
   body: string;
 }

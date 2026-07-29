@@ -18,15 +18,15 @@ export function ResponseDetails({ response }: ResponseDetailsProps) {
         </Badge>
       </div>
 
-      {Object.keys(response.headers).length > 0 && (
+      {response.headers.length > 0 && (
         <Collapsible className="shrink-0 border-b">
           <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-            Response Headers ({Object.keys(response.headers).length})
+            Response Headers ({response.headers.length})
             <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent className="scrollbar-thin max-h-[200px] overflow-auto px-4 pb-2 font-mono text-sm">
-            {Object.entries(response.headers).map(([name, value]) => (
-              <div className="flex gap-2 py-0.5" key={name}>
+            {response.headers.map(([name, value], index) => (
+              <div className="flex gap-2 py-0.5" key={`${name}-${index}`}>
                 <span className="text-muted-foreground">{name}</span>
                 <span className="break-all">{value}</span>
               </div>

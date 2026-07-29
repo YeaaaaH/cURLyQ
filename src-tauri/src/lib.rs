@@ -1,11 +1,14 @@
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tauri::Manager;
 
 #[derive(Serialize)]
 struct HttpResponse {
     status: u16,
-    headers: HashMap<String, String>,
+    // A tuple vec (not HashMap<String, String>) so repeated header names —
+    // e.g. multiple Set-Cookie values — survive instead of the later one
+    // silently overwriting the earlier ones.
+    headers: Vec<(String, String)>,
     body: String,
 }
 
@@ -43,7 +46,7 @@ struct PersistedTab {
     source_collection_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct PersistedTabsFile {
     active_tab_id: Option<String>,
@@ -81,6 +84,7 @@ struct Collection {
 
 #[tauri::command]
 async fn send_request(
+    client: tauri::State<'_, reqwest::Client>,
     method: String,
     url: String,
     headers: Vec<(String, String)>,
@@ -88,7 +92,6 @@ async fn send_request(
 ) -> Result<HttpResponse, String> {
     let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
 
-    let client = reqwest::Client::new();
     let mut request = client.request(method, &url);
     for (name, value) in headers {
         request = request.header(name, value);
@@ -121,7 +124,7 @@ async fn send_request(
                 value.to_str().unwrap_or_default().to_string(),
             )
         })
-        .collect::<HashMap<_, _>>();
+        .collect::<Vec<_>>();
     let body = response.text().await.map_err(|e| e.to_string())?;
 
     Ok(HttpResponse {
@@ -131,10 +134,32 @@ async fn send_request(
     })
 }
 
-fn tabs_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+// Resolves a filename to a path inside the app's data directory, creating
+// that directory if it doesn't exist yet — shared by every persisted-JSON
+// file below (tabs/environments/collections), which otherwise differed only
+// by filename and the type being (de)serialized.
+fn data_file_path(app: &tauri::AppHandle, filename: &str) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("tabs.json"))
+    Ok(dir.join(filename))
+}
+
+fn save_json<T: Serialize>(app: &tauri::AppHandle, filename: &str, data: &T) -> Result<(), String> {
+    let path = data_file_path(app, filename)?;
+    let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
+    std::fs::write(path, json).map_err(|e| e.to_string())
+}
+
+// Returns `T::default()` (an empty Vec, or an empty PersistedTabsFile) when
+// the file hasn't been written yet, rather than treating a first run as an
+// error.
+fn load_json<T: DeserializeOwned + Default>(app: &tauri::AppHandle, filename: &str) -> Result<T, String> {
+    let path = data_file_path(app, filename)?;
+    if !path.exists() {
+        return Ok(T::default());
+    }
+    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&json).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -143,43 +168,22 @@ fn save_tabs(
     active_tab_id: Option<String>,
     tabs: Vec<PersistedTab>,
 ) -> Result<(), String> {
-    let path = tabs_file_path(&app)?;
-    let file = PersistedTabsFile { active_tab_id, tabs };
-    let json = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| e.to_string())
+    save_json(&app, "tabs.json", &PersistedTabsFile { active_tab_id, tabs })
 }
 
 #[tauri::command]
 fn load_tabs(app: tauri::AppHandle) -> Result<PersistedTabsFile, String> {
-    let path = tabs_file_path(&app)?;
-    if !path.exists() {
-        return Ok(PersistedTabsFile { active_tab_id: None, tabs: vec![] });
-    }
-    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&json).map_err(|e| e.to_string())
-}
-
-fn environments_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("environments.json"))
+    load_json(&app, "tabs.json")
 }
 
 #[tauri::command]
 fn save_environments(app: tauri::AppHandle, environments: Vec<Environment>) -> Result<(), String> {
-    let path = environments_file_path(&app)?;
-    let json = serde_json::to_string_pretty(&environments).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| e.to_string())
+    save_json(&app, "environments.json", &environments)
 }
 
 #[tauri::command]
 fn load_environments(app: tauri::AppHandle) -> Result<Vec<Environment>, String> {
-    let path = environments_file_path(&app)?;
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&json).map_err(|e| e.to_string())
+    load_json(&app, "environments.json")
 }
 
 #[cfg(test)]
@@ -232,27 +236,14 @@ mod collection_node_tests {
     }
 }
 
-fn collections_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("collections.json"))
-}
-
 #[tauri::command]
 fn save_collections(app: tauri::AppHandle, collections: Vec<Collection>) -> Result<(), String> {
-    let path = collections_file_path(&app)?;
-    let json = serde_json::to_string_pretty(&collections).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| e.to_string())
+    save_json(&app, "collections.json", &collections)
 }
 
 #[tauri::command]
 fn load_collections(app: tauri::AppHandle) -> Result<Vec<Collection>, String> {
-    let path = collections_file_path(&app)?;
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&json).map_err(|e| e.to_string())
+    load_json(&app, "collections.json")
 }
 
 // Reads an arbitrary file the user picked via the native open dialog (import
@@ -271,9 +262,20 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Built once and reused across every `send_request` call via Tauri's
+    // managed state, instead of a fresh `reqwest::Client` per request — a new
+    // client would throw away connection pooling and redo TLS setup every
+    // single send. The 30s timeout also gives a hung server a firm cutoff
+    // instead of leaving the request pending indefinitely.
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("failed to build the shared HTTP client");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(http_client)
         .invoke_handler(tauri::generate_handler![
             send_request,
             save_tabs,

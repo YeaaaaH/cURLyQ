@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
 import type { Collection, RequestNode } from "@/lib/collections";
@@ -34,7 +35,11 @@ interface SidebarProps {
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
 }
 
-export function Sidebar({
+// Memoized since its collections/environments trees can grow large — every
+// callback prop it receives is itself wrapped in useCallback (see
+// useEnvironments.ts/useCollections.ts/useEdgeDragPanel.ts) so this actually
+// skips re-rendering while, say, typing in the active request's URL/body.
+export const Sidebar = memo(function Sidebar({
   sidebarOpen,
   onHandlePointerDown,
   environments,
@@ -132,4 +137,4 @@ export function Sidebar({
       />
     </>
   );
-}
+});

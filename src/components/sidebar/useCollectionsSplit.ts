@@ -49,11 +49,17 @@ export function useCollectionsSplit() {
       setIsDragging(false);
     }
 
+    // Also ends the drag on pointercancel — without it, an interrupted drag
+    // (e.g. losing focus mid-drag) would leave `isDragging` stuck true
+    // forever, since nothing else flips it back to false and this component
+    // never unmounts to run the cleanup below on its own.
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerUp);
     return () => {
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [isDragging]);
 
