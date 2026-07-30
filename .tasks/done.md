@@ -3,6 +3,24 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Pre-request / post-response scripts (2026-07-31)
+
+Scripts run in an isolated Web Worker (`src/lib/scripting/`) via
+`new Function("ctx", "console", script)` — `ctx` is a narrower, Postman-`pm`-inspired
+object (`environment.get/set/toObject`; `request.headers.get/set` + `request.body.get/set`,
+pre-request only; `response.status/headers/body/json()`, post-response only) plus a
+captured `console.log/warn/error`. A 5s wall-clock timeout kills a runaway script via
+`worker.terminate()`. Non-obvious: the worker streams one `ScriptWorkerMessage` per side
+effect (each `ctx.*.set()`/console call), not one final result — so a script that hangs
+after a few successful calls doesn't lose them when the timeout kills it; `runScript.ts`
+accumulates the stream into the final `ScriptRunResult`. Neither half blocks the request
+on error — a throwing pre-request script still applies whatever it managed before
+throwing, and the request still sends either way. UI: a 3-way switcher in the Scripts tab
+(Pre-request/Post-response/Logs) — Logs shows both halves side-by-side, quiet ("No
+output.") when a script did nothing observable, Success/Failed badges only when there's
+something to report. `Ctrl+/` line-comment toggle (`src/lib/textEditing.ts`) added to
+Scripts + Body editors along the way. Full reference: `docs/scripting.md`.
+
 ## Code Health (2026-07-29)
 
 Full readability/leakage/performance pass. `App.tsx` split 992 → 218 lines into

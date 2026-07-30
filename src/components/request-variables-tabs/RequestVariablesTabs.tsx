@@ -3,10 +3,12 @@ import type { KeyValuePair } from "@/lib/keyValue";
 import { DEFAULT_HEADERS } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
 import type { VariableLookup } from "@/lib/variables";
-import type { RequestTab } from "@/lib/requestTabs";
+import type { RequestTab, ScriptsSubTab } from "@/lib/requestTabs";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 import { VariableAwareTextarea } from "@/components/VariableAwareTextarea";
+import type { ScriptHalf } from "@/lib/scripting/types";
 import { SubTabSwitcher } from "./SubTabSwitcher";
+import { ScriptsTab } from "./scripts/ScriptsTab";
 
 // Which of DEFAULT_HEADERS aren't already covered by one of the user's own
 // header rows (case-insensitive, non-empty key) — those are shown as locked
@@ -98,6 +100,18 @@ export function RequestVariablesTabs({
             />
             {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
           </div>
+        )}
+        {activeRequest.activeSubTab === "scripts" && (
+          <ScriptsTab
+            preRequestScript={activeRequest.preRequestScript}
+            postResponseScript={activeRequest.postResponseScript}
+            activeScriptTab={activeRequest.activeScriptTab}
+            lastScriptRun={activeRequest.lastScriptRun}
+            onChangeScript={(half: ScriptHalf, value: string) =>
+              onUpdate(half === "pre-request" ? { preRequestScript: value } : { postResponseScript: value })
+            }
+            onSelectScriptTab={(tab: ScriptsSubTab) => onUpdate({ activeScriptTab: tab })}
+          />
         )}
       </Card>
     </>

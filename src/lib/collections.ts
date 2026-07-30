@@ -18,6 +18,8 @@ export interface RequestNode {
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
+  preRequestScript: string;
+  postResponseScript: string;
 }
 
 export type CollectionNode = FolderNode | RequestNode;
@@ -46,6 +48,8 @@ export function createRequestNode(name: string): RequestNode {
     params: [],
     headers: [],
     body: "",
+    preRequestScript: "",
+    postResponseScript: "",
   };
 }
 
@@ -198,7 +202,10 @@ export function updateCollectionRequestFields(
   collections: Collection[],
   collectionId: string,
   nodeId: string,
-  fields: Pick<RequestNode, "name" | "method" | "url" | "params" | "headers" | "body">
+  fields: Pick<
+    RequestNode,
+    "name" | "method" | "url" | "params" | "headers" | "body" | "preRequestScript" | "postResponseScript"
+  >
 ): Collection[] {
   return collections.map((c) =>
     c.id === collectionId
@@ -414,6 +421,10 @@ function mapPostmanItems(items: unknown[], counter: { skippedBody: number }): Co
       params: parseParamsFromUrl(url),
       headers,
       body,
+      // Postman's own pre-request/test event scripts aren't mapped yet —
+      // imported requests just start with empty scripts.
+      preRequestScript: "",
+      postResponseScript: "",
     };
   });
 }

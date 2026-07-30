@@ -42,7 +42,12 @@ function App() {
   // requests — a genuine two-way dependency between the two domains.
   const [collections, setCollections] = useState<Collection[]>([]);
 
-  const tabs = useRequestTabs({ variableContext: environments.variableContext, setCollections });
+  const tabs = useRequestTabs({
+    variableContext: environments.variableContext,
+    activeEnvironment: environments.activeEnvironment,
+    applyEnvironmentPatch: environments.applyEnvironmentPatch,
+    setCollections,
+  });
 
   const collectionsApi = useCollections({
     collections,

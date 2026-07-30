@@ -240,12 +240,41 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
     [activeEnvironmentId]
   );
 
+  // Bulk-upserts a pre-request/post-response script's `ctx.environment.set`
+  // calls into the active environment in one shot, rather than one
+  // `updateActiveEnvironmentVariable` call per key — a script can set several
+  // variables in a single run. Existing keys are updated in place; new keys
+  // are appended, then the trailing-blank-row invariant (see keyValue.ts) is
+  // restored since a new row was just spliced in above it.
+  const applyEnvironmentPatch = useCallback(
+    (patch: Record<string, string>) => {
+      const entries = Object.entries(patch);
+      if (activeEnvironmentId === null || entries.length === 0) return;
+      setEnvironments((prev) =>
+        prev.map((e) => {
+          if (e.id !== activeEnvironmentId) return e;
+          let variables = e.variables;
+          for (const [key, value] of entries) {
+            const existingIndex = variables.findIndex((v) => v.key === key);
+            variables =
+              existingIndex !== -1
+                ? variables.map((v, i) => (i === existingIndex ? { ...v, value } : v))
+                : [...variables, { id: crypto.randomUUID(), key, value, enabled: true }];
+          }
+          return { ...e, variables: ensureTrailingBlankRow(stripEmptyRows(variables)) };
+        })
+      );
+    },
+    [activeEnvironmentId]
+  );
+
   return {
     environments,
     activeEnvironmentId,
     setActiveEnvironmentId,
     activeEnvironment,
     variableContext,
+    applyEnvironmentPatch,
     environmentEditorOpen,
     setEnvironmentEditorOpen,
     editingEnvironmentId,

@@ -3,14 +3,31 @@ import type { HttpResponse } from "@/lib/http";
 import type { VariableLookup } from "@/lib/variables/context";
 import { VARIABLE_PATTERN } from "@/lib/variables/tokenizer";
 import { substituteVariables } from "@/lib/variables/resolver";
+import type { ScriptHalf, ScriptRunResult } from "@/lib/scripting/types";
 
-export type SubTab = "params" | "headers" | "body";
+export type SubTab = "params" | "headers" | "body" | "scripts";
 
 export const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: "params", label: "Params" },
   { id: "headers", label: "Headers" },
   { id: "body", label: "Body" },
+  { id: "scripts", label: "Scripts" },
 ];
+
+export interface LastScriptRun {
+  pre: ScriptRunResult | null;
+  post: ScriptRunResult | null;
+}
+
+export function createEmptyScriptRun(): LastScriptRun {
+  return { pre: null, post: null };
+}
+
+// The Scripts tab's own internal switcher has one more option than
+// `ScriptHalf` (which only names the two *execution* kinds) — a third
+// "logs" view with no script text of its own, just this tab's last run
+// results for both halves at once.
+export type ScriptsSubTab = ScriptHalf | "logs";
 
 export interface RequestTab {
   id: string;
@@ -21,6 +38,13 @@ export interface RequestTab {
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
+  preRequestScript: string;
+  postResponseScript: string;
+  activeScriptTab: ScriptsSubTab;
+  // Output of the last time this tab's scripts ran (console logs/errors) —
+  // never persisted, same as response/error/isSending below: it describes
+  // the last send, not saved request state.
+  lastScriptRun: LastScriptRun;
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
@@ -42,6 +66,10 @@ export function createRequestTab(): RequestTab {
     params: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
     headers: [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }],
     body: "",
+    preRequestScript: "",
+    postResponseScript: "",
+    activeScriptTab: "pre-request",
+    lastScriptRun: createEmptyScriptRun(),
     response: null,
     error: null,
     isSending: false,
@@ -61,6 +89,9 @@ export interface PersistedTab {
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
+  preRequestScript: string;
+  postResponseScript: string;
+  activeScriptTab: ScriptsSubTab;
   sourceRequestId: string | null;
   sourceCollectionId: string | null;
 }
@@ -73,7 +104,21 @@ export interface PersistedTabsFile {
 }
 
 export function toPersistedTab(tab: RequestTab): PersistedTab {
-  const { id, name, method, url, activeSubTab, params, headers, body, sourceRequestId, sourceCollectionId } = tab;
+  const {
+    id,
+    name,
+    method,
+    url,
+    activeSubTab,
+    params,
+    headers,
+    body,
+    preRequestScript,
+    postResponseScript,
+    activeScriptTab,
+    sourceRequestId,
+    sourceCollectionId,
+  } = tab;
   return {
     id,
     name,
@@ -83,6 +128,9 @@ export function toPersistedTab(tab: RequestTab): PersistedTab {
     params: stripEmptyRows(params),
     headers: stripEmptyRows(headers),
     body,
+    preRequestScript,
+    postResponseScript,
+    activeScriptTab,
     sourceRequestId,
     sourceCollectionId,
   };
@@ -93,6 +141,7 @@ export function fromPersistedTab(saved: PersistedTab): RequestTab {
     ...saved,
     params: ensureTrailingBlankRow(saved.params),
     headers: ensureTrailingBlankRow(saved.headers),
+    lastScriptRun: createEmptyScriptRun(),
     response: null,
     error: null,
     isSending: false,

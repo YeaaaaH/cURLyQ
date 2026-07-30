@@ -56,10 +56,36 @@ somewhere discoverable once it exists.
 - Rebuild `url.protocol`/`host`/`path`/`query` on export (currently only `url.raw` is
   emitted, which is sufficient for re-import but not a full round-trip).
 
-## Pre-request / post-response scripts
+## Workflows (flows)
 
-Not started. Design decision already made: scripts run as plain JS in the
-webview/frontend, no embedded Rust JS engine.
+Mid-term goal, after core collections work is done. Postman-inspired but
+deliberately lighter: a visual chain of requests, closer to what our team's
+day-to-day API testing actually needs than Postman's heavier canvas/branching
+model.
+
+Design decisions made during brainstorming:
+- First-class entity alongside collections, not nested inside a single one —
+  the whole point is chaining requests that live in *different* collections
+  without duplicating them into a throwaway local collection first.
+- Each step **live-references** a saved request (from any collection, or
+  standalone). Editing the source request updates the flow automatically.
+- Steps run **linearly** (top to bottom) for v1 — no branching/conditional/
+  loop logic. Canvas can still render steps as connected nodes visually;
+  execution itself stays sequential.
+- Data passes between steps via the pre-request/post-response scripting
+  engine (now built — see `.tasks/done.md` and `docs/scripting.md`), e.g.
+  extract a field from step A's response, feed it into step B. That engine
+  currently only keeps each script's *last* run for its own request tab —
+  worth revisiting once a flow can actually chain multiple runs, since
+  debugging a multi-step chain probably wants more than "last run only."
+- Step detail view reuses the existing `RequestBuilder` (params/headers/body
+  tabs) rather than a cramped node-inspector panel — the thing we found
+  ugly/unfriendly about Postman Flows.
+- **Export inlines/snapshots** every referenced request into the flow's JSON,
+  so a flow file is self-contained and shareable — Postman can't do this
+  (Flows have no export option at all, since they reference workspace
+  resources by ID and break on import elsewhere). This is a deliberate
+  advantage to preserve, not an incidental detail.
 
 ## Small UI polish
 
@@ -77,6 +103,23 @@ webview/frontend, no embedded Rust JS engine.
 - Distinct visual treatment for circular vs. plain-unresolved variables (currently
   both render the same "unresolved" red).
 - `{{`-triggered autocomplete of variable names.
+
+## Scripting polish (not in original scope)
+
+- More advanced text editing for the script editor — currently a plain
+  `<textarea>` (`ScriptEditor.tsx`) with only `Ctrl+/` comment-toggle; no JS
+  syntax highlighting, bracket matching, or autocomplete. Likely needs a
+  real editor component (e.g. CodeMirror) rather than extending the plain
+  textarea further — worth designing deliberately rather than bolting on
+  piecemeal, given the Body tab's own "no syntax highlighting" gap
+  (Collections section above) is the same underlying need.
+- Postman's own `event`/`exec` script arrays aren't mapped on import/export —
+  an imported Postman collection's scripts are silently dropped.
+- `ctx.variables.*` alias, mutating the URL or HTTP method from a
+  pre-request script — deliberately left out of v1's `ctx` API surface.
+- Snippet helper buttons / autocomplete for the `ctx` API itself (e.g. a
+  quick-insert for `ctx.environment.set(...)`), separate from the JS syntax
+  highlighting above.
 
 ## Explicitly out of scope for v1 (do not build toward these)
 

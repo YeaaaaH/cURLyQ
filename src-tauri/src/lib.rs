@@ -38,12 +38,25 @@ struct PersistedTab {
     headers: Vec<KeyValuePair>,
     body: String,
     active_sub_tab: String,
+    // Absent in tabs.json files saved before pre-request/post-response
+    // scripts existed — defaulted the same way source_request_id below is,
+    // for the same reason (older files shouldn't fail to parse).
+    #[serde(default)]
+    pre_request_script: String,
+    #[serde(default)]
+    post_response_script: String,
+    #[serde(default = "default_script_tab")]
+    active_script_tab: String,
     // Absent in tabs.json files saved before Collections existed —
     // `#[serde(default)]` reads those as None instead of failing to parse.
     #[serde(default)]
     source_request_id: Option<String>,
     #[serde(default)]
     source_collection_id: Option<String>,
+}
+
+fn default_script_tab() -> String {
+    "pre-request".to_string()
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -72,6 +85,12 @@ enum CollectionNode {
         params: Vec<KeyValuePair>,
         headers: Vec<KeyValuePair>,
         body: String,
+        // Absent in collections.json files saved before scripts existed —
+        // defaulted for the same reason as PersistedTab's script fields above.
+        #[serde(default)]
+        pre_request_script: String,
+        #[serde(default)]
+        post_response_script: String,
     },
 }
 
@@ -208,6 +227,8 @@ mod collection_node_tests {
                 params: vec![],
                 headers: vec![],
                 body: String::new(),
+                pre_request_script: String::new(),
+                post_response_script: String::new(),
             }],
         };
 

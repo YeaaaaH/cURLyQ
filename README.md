@@ -10,6 +10,7 @@ A desktop Postman clone — send HTTP requests, inspect responses. Built as a le
 - **Collections** — Postman-style nested folders, drag-and-drop reordering and moving (including across collections), rename/delete with a cascade-delete confirmation for non-empty folders.
 - **Import/Export** — environments import/export as Postman v2.1 environment JSON, with a recent-activity log (click an entry for full error details) and toast notifications for success/failure. Collections import/export is planned next.
 - **Response viewer** — status, headers, and a pretty-printed body.
+- **Pre-request / post-response scripts** — sandboxed JS scripts per request that can read/write environment variables and (pre-request) tweak headers/body before sending. See [`docs/scripting.md`](./docs/scripting.md).
 
 ## Stack
 
