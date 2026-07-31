@@ -87,6 +87,18 @@ Design decisions made during brainstorming:
   resources by ID and break on import elsewhere). This is a deliberate
   advantage to preserve, not an incidental detail.
 
+## Response metadata
+
+- Track and surface response time (ms) and response size (bytes) next to the
+  status badge in `ResponseDetails.tsx` — called for by the Modernist redesign
+  but not yet backed by real data. `HttpResponse` (`src/lib/http.ts`) and the
+  `send_request` command (`src-tauri/src/lib.rs`) currently only return
+  status/headers/body. Needs: time the request in `send_request` (wrap the
+  `request.send().await` call, e.g. `std::time::Instant`) and compute a size
+  (byte length of the response body, plus headers if we want a "wire size"
+  rather than just body size), thread both through `HttpResponse` and
+  `RequestTab`, then render them in the response header row.
+
 ## Small UI polish
 
 - Colorize the method dropdown in the URL bar: `METHOD_COLORS` (`src/lib/http.ts`)
