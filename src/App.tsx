@@ -64,6 +64,11 @@ function App() {
   const sidebarPanel = useEdgeDragPanel("left");
   const variablesPanel = useEdgeDragPanel("right");
 
+  // Explicit collapse button in the sidebar header, in addition to the
+  // edge-drag handle — stable identity for the memoized Sidebar, same
+  // treatment as the rest of its callback props.
+  const onCollapseSidebar = useCallback(() => sidebarPanel.setOpen(false), [sidebarPanel.setOpen]);
+
   // A live-resizing window with a docked panel open looks jarring (text
   // rewrapping, the cURL block reflowing) — simplest is to just close
   // whichever panel is open rather than trying to animate through it.
@@ -91,7 +96,7 @@ function App() {
 
   return (
     <>
-      <Toaster position="bottom-right" richColors />
+      <Toaster position="bottom-right" />
       <AlertDialog
         open={environments.pendingDeleteEnvironment !== null}
         onOpenChange={(open) => !open && environments.cancelDeleteEnvironment()}
@@ -113,6 +118,7 @@ function App() {
       <Sidebar
         sidebarOpen={sidebarPanel.open}
         onHandlePointerDown={sidebarPanel.onHandlePointerDown}
+        onCollapseSidebar={onCollapseSidebar}
         environments={environments.environments}
         activeEnvironmentId={environments.activeEnvironmentId}
         onSelectEnvironment={environments.setActiveEnvironmentId}
@@ -138,12 +144,11 @@ function App() {
 
       <main
         className={cn(
-          "flex h-screen flex-col gap-5 overflow-hidden p-6 transition-[margin-left,margin-right] duration-150",
+          "flex h-screen flex-col overflow-hidden transition-[margin-left,margin-right] duration-150",
           sidebarPanel.open ? "ml-[max(16vw,180px)]" : "ml-0",
           variablesPanel.open ? "mr-[max(16vw,280px)]" : "mr-0"
         )}
       >
-      <div className="flex shrink-0 flex-col gap-3">
         <TabBar
           requests={tabs.requests}
           activeId={tabs.activeId}
@@ -166,50 +171,53 @@ function App() {
           onRemoveEnvironmentVariable={environments.removeEnvironmentVariable}
         />
 
-        <RequestEditor
-          key={tabs.activeRequest.id}
-          activeRequest={tabs.activeRequest}
-          onUpdate={tabs.updateActiveRequest}
-          onCommitName={tabs.handleCommitRequestName}
-          onUpdateMethod={tabs.handleUpdateMethod}
-          onUrlChange={tabs.handleUrlChange}
-          onSend={tabs.handleSend}
-          canSend={tabs.canSend}
-          urlError={tabs.urlError}
-          unresolvedVariables={tabs.unresolvedVariables}
-          onSaveInPlace={tabs.handleSaveActiveRequestInPlace}
-          collections={collections}
-          onAddCollection={collectionsApi.handleAddCollection}
-          onConfirmSaveTo={tabs.handleConfirmSaveTo}
-          activeEnvironment={environments.activeEnvironment}
-          variableContext={environments.variableContext}
-          onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
-          onOpenEnvironment={handleOpenEnvironment}
-          onOpenVariablesPanel={handleOpenVariablesPanel}
-        />
-      </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden p-6">
+          <div className="flex shrink-0 flex-col gap-3">
+            <RequestEditor
+              key={tabs.activeRequest.id}
+              activeRequest={tabs.activeRequest}
+              onUpdate={tabs.updateActiveRequest}
+              onCommitName={tabs.handleCommitRequestName}
+              onUpdateMethod={tabs.handleUpdateMethod}
+              onUrlChange={tabs.handleUrlChange}
+              onSend={tabs.handleSend}
+              canSend={tabs.canSend}
+              urlError={tabs.urlError}
+              unresolvedVariables={tabs.unresolvedVariables}
+              onSaveInPlace={tabs.handleSaveActiveRequestInPlace}
+              collections={collections}
+              onAddCollection={collectionsApi.handleAddCollection}
+              onConfirmSaveTo={tabs.handleConfirmSaveTo}
+              activeEnvironment={environments.activeEnvironment}
+              variableContext={environments.variableContext}
+              onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+              onOpenEnvironment={handleOpenEnvironment}
+              onOpenVariablesPanel={handleOpenVariablesPanel}
+            />
+          </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5">
-        <RequestVariablesTabs
-          key={tabs.activeRequest.id}
-          activeRequest={tabs.activeRequest}
-          onUpdate={tabs.updateActiveRequest}
-          updateParam={tabs.updateParam}
-          removeParam={tabs.removeParam}
-          updateHeader={tabs.updateHeader}
-          removeHeader={tabs.removeHeader}
-          onBodyKeyDown={tabs.handleBodyKeyDown}
-          bodyError={tabs.bodyError}
-          activeEnvironment={environments.activeEnvironment}
-          variableContext={environments.variableContext}
-          onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
-          onOpenEnvironment={handleOpenEnvironment}
-          onOpenVariablesPanel={handleOpenVariablesPanel}
-        />
+          <div className="flex min-h-0 flex-1 flex-col gap-5">
+            <RequestVariablesTabs
+              key={tabs.activeRequest.id}
+              activeRequest={tabs.activeRequest}
+              onUpdate={tabs.updateActiveRequest}
+              updateParam={tabs.updateParam}
+              removeParam={tabs.removeParam}
+              updateHeader={tabs.updateHeader}
+              removeHeader={tabs.removeHeader}
+              onBodyKeyDown={tabs.handleBodyKeyDown}
+              bodyError={tabs.bodyError}
+              activeEnvironment={environments.activeEnvironment}
+              variableContext={environments.variableContext}
+              onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+              onOpenEnvironment={handleOpenEnvironment}
+              onOpenVariablesPanel={handleOpenVariablesPanel}
+            />
 
-        <ResponseContainer error={tabs.activeRequest.error} response={tabs.activeRequest.response} />
-      </div>
-    </main>
+            <ResponseContainer error={tabs.activeRequest.error} response={tabs.activeRequest.response} />
+          </div>
+        </div>
+      </main>
 
     <VariablesPanel
       open={variablesPanel.open}

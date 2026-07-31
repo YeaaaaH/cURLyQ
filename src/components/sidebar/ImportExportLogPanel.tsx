@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, History, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { type ImportExportLogEntry, formatRelativeTime } from "@/lib/importExportLog";
 
 function formatLogEntrySummary(entry: ImportExportLogEntry): string {
@@ -59,7 +60,7 @@ export function ImportExportLogPanel({ log }: ImportExportLogPanelProps) {
                   className="flex items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent"
                 >
                   {entry.status === "success" ? (
-                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
                   ) : (
                     <XCircle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                   )}
@@ -80,7 +81,16 @@ export function ImportExportLogPanel({ log }: ImportExportLogPanelProps) {
           {detailEntry && (
             <>
               <DialogHeader>
-                <DialogTitle>{logEntryDialogTitle(detailEntry)}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "size-2 shrink-0 rounded-full",
+                      detailEntry.status === "success" ? "bg-success" : "bg-destructive"
+                    )}
+                    aria-hidden
+                  />
+                  {logEntryDialogTitle(detailEntry)}
+                </DialogTitle>
                 <DialogDescription>{new Date(detailEntry.timestamp).toLocaleString()}</DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2 text-sm">

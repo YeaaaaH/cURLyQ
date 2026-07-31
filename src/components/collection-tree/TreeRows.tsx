@@ -138,7 +138,12 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
         onClick={() => onOpenRequest(collectionId, node)}
         className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:text-foreground"
       >
-        <span className={cn("w-8 shrink-0 overflow-hidden text-[9px] font-semibold tracking-tighter", METHOD_COLORS[node.method])}>
+        <span
+          className={cn(
+            "w-8 shrink-0 overflow-hidden text-center text-[9px] font-semibold tracking-tighter",
+            METHOD_COLORS[node.method]
+          )}
+        >
           {node.method}
         </span>
         {isRenaming ? (

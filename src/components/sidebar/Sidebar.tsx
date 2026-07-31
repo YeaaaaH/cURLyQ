@@ -1,4 +1,6 @@
 import { memo } from "react";
+import { Button } from "@/components/ui/button";
+import { PanelLeftClose } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
 import type { Collection, RequestNode } from "@/lib/collections";
@@ -12,6 +14,7 @@ import { useCollectionsSplit } from "./useCollectionsSplit";
 interface SidebarProps {
   sidebarOpen: boolean;
   onHandlePointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onCollapseSidebar: () => void;
   environments: readonly Environment[];
   activeEnvironmentId: string | null;
   onSelectEnvironment: (id: string) => void;
@@ -42,6 +45,7 @@ interface SidebarProps {
 export const Sidebar = memo(function Sidebar({
   sidebarOpen,
   onHandlePointerDown,
+  onCollapseSidebar,
   environments,
   activeEnvironmentId,
   onSelectEnvironment,
@@ -70,11 +74,28 @@ export const Sidebar = memo(function Sidebar({
     <>
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-30 overflow-hidden border-r bg-muted transition-[width] duration-150",
+          "fixed inset-y-0 left-0 z-30 overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-150",
           sidebarOpen ? "w-[var(--app-sidebar-width)]" : "w-0"
         )}
       >
         <div className="flex h-full w-[var(--app-sidebar-width)] flex-col gap-1 p-3">
+          <div className="flex shrink-0 items-center gap-2 pb-1">
+            <div className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-primary/90 to-primary text-sm font-extrabold text-primary-foreground shadow-sm">
+              Q
+            </div>
+            <span className="text-base font-extrabold tracking-tight">cURLyQ</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={onCollapseSidebar}
+              aria-label="Collapse sidebar"
+              className="ml-auto size-7"
+            >
+              <PanelLeftClose className="size-3.5" />
+            </Button>
+          </div>
+
           <SidebarSearchAndAdd
             onAddCollection={onAddCollection}
             onAddEnvironment={onAddEnvironment}
@@ -122,7 +143,9 @@ export const Sidebar = memo(function Sidebar({
             onDeleteEnvironment={onDeleteEnvironment}
           />
 
-          <ImportExportLogPanel log={importExportLog} />
+          <div className="mt-auto">
+            <ImportExportLogPanel log={importExportLog} />
+          </div>
         </div>
       </div>
 

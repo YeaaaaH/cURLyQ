@@ -47,14 +47,7 @@ export function ScriptOutputSection({ label, result }: ScriptOutputSectionProps)
       <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
         {label}
         {result?.error && <Badge variant="destructive">Failed</Badge>}
-        {result && !result.error && hasOutput && (
-          <Badge
-            variant="outline"
-            className="border-transparent bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20"
-          >
-            Success
-          </Badge>
-        )}
+        {result && !result.error && hasOutput && <Badge variant="success">Success</Badge>}
       </div>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto font-mono text-xs">
         {result === null ? (
@@ -64,7 +57,7 @@ export function ScriptOutputSection({ label, result }: ScriptOutputSectionProps)
         ) : (
           <div className="flex flex-col gap-0.5">
             {changes.map((change, i) => (
-              <p key={`change-${i}`} className="text-emerald-600">
+              <p key={`change-${i}`} className="text-success">
                 {change}
               </p>
             ))}

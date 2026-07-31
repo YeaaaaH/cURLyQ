@@ -117,7 +117,7 @@ export function TreeDragOverlay({ preview }: TreeDragOverlayProps) {
           {preview.method ? (
             <span
               className={cn(
-                "w-8 shrink-0 overflow-hidden text-[9px] font-semibold tracking-tighter",
+                "w-8 shrink-0 overflow-hidden text-center text-[9px] font-semibold tracking-tighter",
                 METHOD_COLORS[preview.method]
               )}
             >

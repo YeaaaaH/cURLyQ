@@ -52,12 +52,12 @@ export function TabBar({
 }: TabBarProps) {
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar px-5 py-3">
         <RequestTabList requests={requests} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} />
 
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={onAddTab}
           aria-label="New request tab"

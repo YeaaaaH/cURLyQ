@@ -1,12 +1,16 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Download, Trash2 } from "lucide-react";
 import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
 import { EnvironmentEditor } from "@/components/EnvironmentEditor";
 
 // The Dialog "popup" chrome (overlay, centering, the "Environments" title,
-// the built-in close button) around EnvironmentEditor, which is just the
-// content shown inside it — split out so the popup itself has its own name
-// instead of being anonymous JSX inline in TabBar.
+// the footer's Export/Delete/Done actions for whichever environment is
+// currently selected, the built-in close button) around EnvironmentEditor,
+// which is just the left-rail-plus-variables content shown inside it — split
+// out so the popup itself has its own name instead of being anonymous JSX
+// inline in TabBar.
 export function EnvironmentsEditorPopup({
   open,
   onOpenChange,
@@ -34,7 +38,7 @@ export function EnvironmentsEditorPopup({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw]">
+      <DialogContent className="flex h-[75vh] w-[80vw] max-w-[80vw] flex-col sm:max-w-[80vw]">
         <DialogHeader>
           <DialogTitle>Environments</DialogTitle>
         </DialogHeader>
@@ -44,11 +48,31 @@ export function EnvironmentsEditorPopup({
           onSelectEditing={onSelectEditing}
           onAdd={onAdd}
           onRename={onRename}
-          onDelete={onDelete}
-          onExport={onExport}
           onUpdateVariable={onUpdateVariable}
           onRemoveVariable={onRemoveVariable}
         />
+        {editingId && (
+          <DialogFooter>
+            <div className="flex gap-2 sm:mr-auto">
+              <Button type="button" variant="outline" onClick={() => onExport(editingId)} className="gap-1.5">
+                <Download className="size-3.5" />
+                Export
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onDelete(editingId)}
+                className="gap-1.5 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="size-3.5" />
+                Delete environment
+              </Button>
+            </div>
+            <Button type="button" onClick={() => onOpenChange(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -3,6 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, Download, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
+import { CAPPED_LIST_MAX_HEIGHT_PX } from "./constants";
 
 interface EnvironmentRowProps {
   environment: Environment;
@@ -20,11 +21,12 @@ function EnvironmentRow({ environment, active, onSelect, onExport, onEdit, onDel
         type="button"
         onClick={onSelect}
         className={cn(
-          "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm",
+          "flex min-w-0 flex-1 items-center gap-2 truncate px-2 py-1.5 text-left text-sm",
           active ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
         )}
       >
-        {environment.name}
+        <span className={cn("size-1.5 shrink-0 rounded-full", active ? "bg-success" : "bg-border")} aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{environment.name}</span>
       </button>
       <Button
         type="button"
@@ -78,13 +80,16 @@ export function EnvironmentsSection({
   onDeleteEnvironment,
 }: EnvironmentsSectionProps) {
   return (
-    <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+    <Collapsible defaultOpen className="flex shrink-0 flex-col">
       <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
         Environments
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex min-h-0 flex-1 flex-col gap-1 pl-3">
-        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+      <CollapsibleContent className="flex flex-col gap-1 pl-3">
+        <div
+          className="scrollbar-thin flex flex-col gap-0.5 overflow-y-auto"
+          style={{ maxHeight: CAPPED_LIST_MAX_HEIGHT_PX }}
+        >
           {environments.map((environment) => (
             <EnvironmentRow
               key={environment.id}

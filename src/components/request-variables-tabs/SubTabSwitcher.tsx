@@ -17,7 +17,7 @@ export function SubTabSwitcher({ activeSubTab, onSelectSubTab }: SubTabSwitcherP
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             activeSubTab === tab.id
-              ? "border border-input bg-background text-foreground"
+              ? "border border-input bg-card text-foreground"
               : "text-muted-foreground hover:text-foreground"
           )}
         >

@@ -24,7 +24,7 @@ export function CurlPreview({ curlCommand }: CurlPreviewProps) {
           <Copy className="size-3.5" />
         </Button>
       </div>
-      <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto rounded-md border border-input bg-background p-2 font-mono text-xs whitespace-pre-wrap text-foreground">
+      <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto rounded-md border border-input bg-card p-2 font-mono text-xs whitespace-pre-wrap text-foreground">
         {curlCommand}
       </pre>
     </div>

@@ -26,7 +26,7 @@ export function RequestNameBar({ name, onNameChange, onCommitName, onSave, onSav
         onBlur={onCommitName}
         placeholder="Untitled request"
         aria-label="Request name"
-        className="w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="w-full rounded-md bg-transparent px-2 py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring-glow"
       />
       <ButtonGroup className="shrink-0">
         <Button type="button" variant="outline" onClick={onSave} title="Save (Ctrl+S)">

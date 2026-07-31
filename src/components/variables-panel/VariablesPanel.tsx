@@ -37,7 +37,7 @@ export function VariablesPanel({
     <>
       <div
         className={cn(
-          "fixed inset-y-0 right-0 z-30 overflow-hidden border-l bg-muted transition-[width] duration-150",
+          "fixed inset-y-0 right-0 z-30 overflow-hidden border-l border-sidebar-border bg-sidebar transition-[width] duration-150",
           open ? "w-[max(16vw,280px)]" : "w-0"
         )}
       >
@@ -58,7 +58,7 @@ export function VariablesPanel({
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   activeTab === tab.id
-                    ? "border border-input bg-background text-foreground"
+                    ? "border border-input bg-card text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >

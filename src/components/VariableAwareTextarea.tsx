@@ -103,7 +103,7 @@ export function VariableAwareTextarea({
     tokenList.forEach((token, i) => {
       if (token.start > cursor) segments.push(...renderRun(text.slice(cursor, token.start), cursor));
       const resolution = resolveVariable(token.name, variableContext);
-      const tokenColor = resolution.kind === "resolved" ? "var(--color-ring)" : "var(--color-destructive)";
+      const tokenColor = resolution.kind === "resolved" ? "var(--color-variable-resolved)" : "var(--color-destructive)";
       segments.push(
         <span key={`token-${i}`} ref={(el) => registerTokenSpan(i, el)}>
           {renderRun(text.slice(token.start, token.end), token.start, tokenColor)}

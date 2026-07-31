@@ -1,11 +1,12 @@
 export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
+// Text-only — colored label, no chip background.
 export const METHOD_COLORS: Record<string, string> = {
-  GET: "text-green-600",
-  POST: "text-amber-600",
-  PUT: "text-blue-600",
-  PATCH: "text-purple-600",
-  DELETE: "text-destructive",
+  GET: "text-method-get",
+  POST: "text-method-post",
+  PUT: "text-method-put",
+  PATCH: "text-method-patch",
+  DELETE: "text-method-delete",
 };
 
 // Sent automatically with every request unless the user's own headers

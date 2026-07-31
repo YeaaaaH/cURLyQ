@@ -65,13 +65,14 @@ export function RequestVariablesTabs({
         onSelectSubTab={(tab) => onUpdate({ activeSubTab: tab })}
       />
 
-      <Card className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto rounded-lg border border-input p-3 text-sm text-muted-foreground ring-0">
+      <Card className="scrollbar-thin h-[340px] shrink-0 overflow-y-auto border border-input p-3 text-sm text-muted-foreground ring-0">
         {activeRequest.activeSubTab === "params" && (
           <KeyValueEditor
             rows={activeRequest.params}
             onUpdate={updateParam}
             onRemove={removeParam}
             variableAware={variableAware}
+            itemLabel="param"
           />
         )}
         {activeRequest.activeSubTab === "headers" && (
@@ -81,6 +82,7 @@ export function RequestVariablesTabs({
             onRemove={removeHeader}
             lockedRows={unmatchedDefaultHeaders(activeRequest.headers)}
             variableAware={variableAware}
+            itemLabel="header"
           />
         )}
         {activeRequest.activeSubTab === "body" && (

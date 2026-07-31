@@ -156,8 +156,8 @@ export function formatBody(body: string): string {
   }
 }
 
-export function statusVariant(status: number): "default" | "secondary" | "destructive" {
-  if (status < 300) return "default";
+export function statusVariant(status: number): "success" | "secondary" | "destructive" {
+  if (status < 300) return "success";
   if (status < 400) return "secondary";
   return "destructive";
 }

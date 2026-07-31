@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Collection, RequestNode } from "@/lib/collections";
 import { CollectionTree } from "@/components/collection-tree/CollectionTree";
 
@@ -36,7 +37,7 @@ export function CollectionsSection({
   return (
     <div
       ref={wrapperRef}
-      className="flex min-h-0 max-h-[50%] shrink flex-col"
+      className={cn("flex min-h-0 flex-col", height === null && "flex-1")}
       style={height !== null ? { height, maxHeight: height, flexShrink: 0 } : undefined}
     >
       <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">

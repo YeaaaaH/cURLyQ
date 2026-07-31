@@ -26,7 +26,9 @@ function RequestTabItem({ tab, active, onSelect, onClose, ref }: RequestTabItemP
       }}
       className={cn(
         "flex shrink-0 cursor-default items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
-        active ? "border border-input bg-background" : "bg-secondary text-muted-foreground hover:text-foreground"
+        active
+          ? "border border-border bg-card"
+          : "border border-transparent bg-transparent text-muted-foreground hover:text-foreground"
       )}
     >
       <span className={cn("text-xs font-semibold", METHOD_COLORS[tab.method])}>{tab.method}</span>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import { type KeyValuePair, ensureTrailingBlankRow, removeRow, stripEmptyRows, updateRows } from "@/lib/keyValue";
 import { findAllVariableNames, getUnresolvedVariables, resolveRequest } from "@/lib/variables";
 import type { VariableLookup } from "@/lib/variables/context";
@@ -245,6 +246,7 @@ export function useRequestTabs({
         postResponseScript: activeRequest.postResponseScript,
       })
     );
+    toast.success(`Saved "${activeRequest.name}"`);
   }
 
   // Confirming the "Save to..." picker always creates a brand-new request
@@ -266,6 +268,7 @@ export function useRequestTabs({
     };
     setCollections((prev) => addNodeToCollection(prev, collectionId, parentFolderId, node));
     updateActiveRequest({ name, sourceRequestId: node.id, sourceCollectionId: collectionId });
+    toast.success(`Saved "${name}"`);
   }
 
   function handleAddTab() {

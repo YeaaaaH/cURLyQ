@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Braces } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HTTP_METHODS, METHOD_COLORS } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
@@ -66,13 +67,23 @@ export function UrlBar({
           placeholder="https://example.com"
           ariaInvalid={urlError !== null}
         />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={onOpenVariablesPanel}
+          aria-label="Variables in request"
+          className="shrink-0"
+        >
+          <Braces className="size-4" />
+        </Button>
         <Button type="submit" className="w-24" disabled={isSending || !canSend}>
           {isSending ? "Sending…" : "Send"}
         </Button>
       </div>
       {urlError && <p className="text-sm text-destructive">{urlError}</p>}
       {unresolvedVariables.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-destructive">
           Unresolved variable{unresolvedVariables.length > 1 ? "s" : ""}:{" "}
           {unresolvedVariables.map((name) => `{{${name}}}`).join(", ")}
         </p>

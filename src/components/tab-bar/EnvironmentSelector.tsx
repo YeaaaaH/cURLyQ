@@ -4,6 +4,7 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Globe, Pencil } from "lucide-react";
@@ -27,7 +28,7 @@ export function EnvironmentSelector({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="max-w-[9rem] shrink-0 gap-1.5 text-muted-foreground">
+        <Button type="button" variant="outline" className="max-w-[9rem] shrink-0 gap-1.5 text-muted-foreground">
           <Globe className="size-3.5 shrink-0" />
           <span className="min-w-0 truncate">{activeEnvironment?.name ?? "No environment"}</span>
           <ChevronDown className="size-3.5 shrink-0" />
@@ -63,6 +64,19 @@ export function EnvironmentSelector({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
+        {environments.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <button
+              type="button"
+              onClick={() => onEditEnvironment(activeEnvironmentId ?? environments[0].id)}
+              className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-sm font-medium text-primary hover:bg-accent"
+            >
+              <Pencil className="size-3.5 shrink-0" />
+              Edit environment variables
+            </button>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

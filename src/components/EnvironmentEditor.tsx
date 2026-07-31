@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Check, Download, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
@@ -69,8 +63,6 @@ export function EnvironmentEditor({
   onSelectEditing,
   onAdd,
   onRename,
-  onDelete,
-  onExport,
   onUpdateVariable,
   onRemoveVariable,
 }: {
@@ -79,58 +71,28 @@ export function EnvironmentEditor({
   onSelectEditing: (id: string) => void;
   onAdd: () => void;
   onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
-  onExport: (id: string) => void;
   onUpdateVariable: (index: number, patch: Partial<KeyValuePair>) => void;
   onRemoveVariable: (index: number) => void;
 }) {
   const editing = environments.find((e) => e.id === editingId) ?? null;
 
   return (
-    <div className="flex h-[75vh] gap-4">
-      <div className="flex w-64 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-1 pr-3">
+    <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-1 pr-3">
         {environments.map((env) => (
-          <div
+          <button
             key={env.id}
+            type="button"
+            onClick={() => onSelectEditing(env.id)}
             className={cn(
-              "group/env-row flex shrink-0 items-center rounded-md",
-              env.id === editingId && "bg-secondary"
+              "min-w-0 shrink-0 truncate rounded-md px-2 py-1.5 text-left text-sm",
+              env.id === editingId
+                ? "bg-secondary font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <button
-              type="button"
-              onClick={() => onSelectEditing(env.id)}
-              className={cn(
-                "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm",
-                env.id === editingId ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {env.name}
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${env.name} options`}
-                  className="mr-0.5 shrink-0 text-muted-foreground opacity-0 group-hover/env-row:opacity-100 data-[state=open]:opacity-100"
-                >
-                  <MoreHorizontal className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => onExport(env.id)}>
-                  <Download className="size-3.5" />
-                  Export...
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onClick={() => onDelete(env.id)}>
-                  <Trash2 className="size-3.5" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+            {env.name}
+          </button>
         ))}
         <Button
           type="button"
@@ -156,6 +118,7 @@ export function EnvironmentEditor({
               rows={editing.variables}
               onUpdate={onUpdateVariable}
               onRemove={onRemoveVariable}
+              itemLabel="variable"
             />
           </>
         ) : (

@@ -132,7 +132,7 @@ export function VariableAwareInput({
     tokenList.forEach((token, i) => {
       if (token.start > cursor) segments.push(...renderRun(text.slice(cursor, token.start), cursor));
       const resolution = resolveVariable(token.name, variableContext);
-      const tokenColor = resolution.kind === "resolved" ? "var(--color-ring)" : "var(--color-destructive)";
+      const tokenColor = resolution.kind === "resolved" ? "var(--color-variable-resolved)" : "var(--color-destructive)";
       segments.push(
         <span key={`token-${i}`} ref={(el) => registerTokenSpan(i, el)}>
           {renderRun(text.slice(token.start, token.end), token.start, tokenColor)}
@@ -171,7 +171,7 @@ export function VariableAwareInput({
           // useTextSelection.ts) — the real input's native one is hidden
           // (not disabled: selection/copy/keyboard-extend still work) so it
           // doesn't also paint a second, uncoordinated band underneath.
-          "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-transparent caret-foreground transition-colors outline-none selection:bg-transparent placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+          "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-transparent caret-foreground transition-colors outline-none selection:bg-transparent placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring-glow aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
           className
         )}
       />
