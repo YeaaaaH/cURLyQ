@@ -12,6 +12,9 @@
     --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
     --color-success: var(--success);
     --color-variable-resolved: var(--variable-resolved);
+    --color-drop-indicator: var(--drop-indicator);
+    --shadow-sm: var(--elevation-sm);
+    --shadow-md: var(--elevation-md);
     --color-ring-glow: var(--ring-glow);
     --color-method-get: var(--method-get);
     --color-method-post: var(--method-post);
@@ -80,6 +83,9 @@
     --ring-glow: #ffe0d5;
     --success: #1f9d63;
     --variable-resolved: #1568c9;
+    --drop-indicator: #da9100;
+    --elevation-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --elevation-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --method-get: #1f9d63;
     --method-post: #b9880a;
     --method-put: #1568c9;

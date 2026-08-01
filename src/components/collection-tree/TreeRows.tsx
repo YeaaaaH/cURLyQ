@@ -5,7 +5,7 @@ import { METHOD_COLORS } from "@/lib/http";
 import type { Collection, CollectionNode, FolderNode, RequestNode } from "@/lib/collections";
 import { NodeMenu, QuickAddRequestButton, RenameInput } from "./TreeControls";
 import { BeforeDropZone, EndDropZone, useTreeDragAndDrop } from "./TreeDragAndDrop";
-import { EMPTY_LABEL_OFFSET_PX, TREE_INDENT_PX } from "./constants";
+import { ACTIVE_DROP_BORDER_CLASS, EMPTY_LABEL_OFFSET_PX, TREE_INDENT_PX } from "./constants";
 import type { TreeHandlers } from "./types";
 
 interface BaseNodeRowProps {
@@ -128,7 +128,7 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
         // absolutely-positioned overlay — the latter rendered at a
         // different sub-pixel Y-offset per row depending on scroll
         // position and looked visibly blurred on some rows.
-        dnd.isOver ? "rounded-t-none border-[#DA9100]/75" : "border-transparent"
+        dnd.isOver ? cn("rounded-t-none", ACTIVE_DROP_BORDER_CLASS) : "border-transparent"
       )}
       style={{ paddingLeft: depth * TREE_INDENT_PX }}
     >
