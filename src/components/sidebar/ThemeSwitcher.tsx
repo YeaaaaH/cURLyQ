@@ -10,7 +10,6 @@ import {
 import { Moon, Palette, SquareTerminal, Sun } from "lucide-react";
 import { useTheme, type ThemeName } from "@/components/ThemeProvider";
 
-// Not persisted yet — resets to light on reload.
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
 
