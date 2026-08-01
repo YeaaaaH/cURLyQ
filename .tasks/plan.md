@@ -8,20 +8,6 @@ here. Keep aligned with `project_specs.md`'s v1 scope.
 running app, then mark it done here (and move a short summary to `done.md`) before
 starting the next.
 
-## Collections
-
-- Duplicate a request or folder.
-- Auto-expand a collapsed folder/collection when something is dragged over it and held
-  there (currently requires expanding by hand first).
-- `SaveRequestDialog`'s tree picker has no create-folder affordance of its own — revisit
-  alongside a proper name-prompt flow (matching the sidebar's inline-rename convention)
-  rather than the current auto-named "New Collection" quick-create, if it turns out to
-  matter in practice.
-- The Body tab's plain `<textarea>` (no syntax highlighting/formatting beyond the
-  existing non-blocking "invalid JSON" hint) might be worth revisiting — flagged in
-  passing, no specific direction yet. Partially softened by the variable-engine's token
-  coloring, but full syntax highlighting is still unbuilt.
-
 ## Sidebar search
 
 `SidebarSearchAndAdd.tsx`'s search input is an unwired shell — needs actual
@@ -56,26 +42,11 @@ mechanical; the auto-expand-reveal layer is the tricky part, since it must
 not disturb persisted expand state. Worth two review checkpoints — (1) query
 plumbing + basic filtering, (2) auto-expand-reveal on top.
 
-## Import/Export (Postman v2.1)
-
-- Secret-type variable masking (Postman's `type: "secret"`).
-- Preserve Postman's own `id`/`_postman_*` metadata for round-trip fidelity (currently
-  dropped on import, regenerated fresh on export).
-- Persist the import/export log across restarts (currently session-only, resets on
-  every launch).
-- Non-raw request body modes (form-data, urlencoded, GraphQL) — currently import as an
-  empty body with a note in the toast/log, since v1 scope is raw/JSON bodies only.
-- Export a single folder as its own Postman collection (Postman itself supports this;
-  only whole-collection export is built).
-- Rebuild `url.protocol`/`host`/`path`/`query` on export (currently only `url.raw` is
-  emitted, which is sufficient for re-import but not a full round-trip).
-
 ## Workflows (flows)
 
-Mid-term goal, after core collections work is done. Postman-inspired but
-deliberately lighter: a visual chain of requests, closer to what our team's
-day-to-day API testing actually needs than Postman's heavier canvas/branching
-model.
+Mid-term goal. Postman-inspired but deliberately lighter: a visual chain of
+requests, closer to what our team's day-to-day API testing actually needs
+than Postman's heavier canvas/branching model.
 
 Design decisions made during brainstorming:
 - First-class entity alongside collections, not nested inside a single one —
@@ -83,15 +54,35 @@ Design decisions made during brainstorming:
   without duplicating them into a throwaway local collection first.
 - Each step **live-references** a saved request (from any collection, or
   standalone). Editing the source request updates the flow automatically.
-- Steps run **linearly** (top to bottom) for v1 — no branching/conditional/
-  loop logic. Canvas can still render steps as connected nodes visually;
-  execution itself stays sequential.
-- Data passes between steps via the pre-request/post-response scripting
-  engine (now built — see `.tasks/done.md` and `docs/scripting.md`), e.g.
-  extract a field from step A's response, feed it into step B. That engine
-  currently only keeps each script's *last* run for its own request tab —
-  worth revisiting once a flow can actually chain multiple runs, since
-  debugging a multi-step chain probably wants more than "last run only."
+- Steps run **linearly** (top to bottom) for v1 — deliberately not a DAG or
+  parallel executor, even though explicit bindings (below) would make one
+  derivable later without a data-model change. No branching/conditional/
+  loop logic (Postman's `setNextRequest()` makes control flow untraceable
+  from the UI — not repeating that). Canvas can still render steps as
+  connected nodes visually; execution itself stays sequential.
+- Data passes between steps via **explicit typed bindings**, not implicit
+  script side effects: each step defines an `extract` block (named outputs
+  pulled from its response, e.g. via a JSON path) and a later step binds a
+  field to `{{steps.<stepId>.<name>}}` — reusing the existing Variable
+  Engine (`src/lib/variables/`) for resolution, cycle detection, and
+  resolved/unresolved token coloring rather than building new resolver
+  infra. Pre/post-response scripts remain available as an escape hatch for
+  logic a declarative extractor can't express (e.g. computing a signature)
+  — a script's `ctx.environment.set()` output is exposed as a binding the
+  same way a declarative extract is, but extract/bind is the primary,
+  inspectable channel, not scripts. Rationale: Postman's chaining lives
+  entirely in script side effects on a shared variable bag, so there's no
+  static link between a producer and consumer step — a response-shape
+  change three steps back surfaces as a runtime error nobody can trace to
+  its source. Known cost: the extract-field UI (JSON path editor + response
+  validation) is new surface area, not something reused from the existing
+  script textarea.
+- **Resumable runs**: persist each step's extracted/bound values as a
+  snapshot keyed by step id, so a failed run at step 7 can resume from step
+  6's snapshot instead of re-executing steps 1–6 (and their side effects —
+  e.g. a POST that creates a resource) from scratch. Replaces the scripting
+  engine's earlier "last run only" limitation with a concrete per-step
+  history a flow run can actually use.
 - Step detail view reuses the existing `RequestBuilder` (params/headers/body
   tabs) rather than a cramped node-inspector panel — the thing we found
   ugly/unfriendly about Postman Flows.
@@ -100,6 +91,41 @@ Design decisions made during brainstorming:
   (Flows have no export option at all, since they reference workspace
   resources by ID and break on import elsewhere). This is a deliberate
   advantage to preserve, not an incidental detail.
+
+## Collection run
+
+Goal: batch-execute every request in a collection or folder, top-to-bottom in
+current tree order — Postman's "Collection Runner," scoped down. Distinct
+from Workflows (flows) above: no curated step list, no cross-collection
+chaining, just "run what's already in this collection/folder."
+
+Design decisions made during brainstorming:
+- Trigger from a collection's or folder's context menu ("Run collection" /
+  "Run folder") rather than a new top-level entity like Workflows.
+- Sequential execution only, recursing into nested folders in tree order. No
+  parallelism, no reordering separate from the tree itself.
+- On failure, don't stop the run — execute every request regardless and
+  report pass/fail per request at the end, like Postman's Runner.
+- Runs headlessly against `send_request` rather than opening a tab per
+  request — needs a dedicated results view (list of requests with
+  status/time, expandable per-request detail) rather than reusing
+  `RequestTab`/`ResponseDetails`.
+- Reuses the existing scripting engine as-is for data passing between
+  requests — pre-request/post-response scripts already read/write the
+  active environment via `ctx.environment.get/set`, so a later request in
+  the run sees an earlier request's `ctx.environment.set()` calls with no
+  new mechanism needed. Runs against the currently active environment, same
+  as a normal single send.
+- No data-driven iteration for v1 (no CSV/JSON data file, no repeat-N-times)
+  — a single top-to-bottom pass only. Worth revisiting as a later polish
+  item if it turns out to matter in practice.
+
+Open question, needs deciding before implementation: what counts as
+"failure" for the pass/fail report. The scripting engine has no assertion
+concept (a `pm.test()` equivalent) today — only pre-request/post-response
+side-effect scripts. Simplest v1 definition is "non-2xx status or network
+error," with real assertions deferred; worth confirming that's acceptable
+before designing the results UI around it.
 
 ## Response metadata
 
@@ -112,13 +138,6 @@ Design decisions made during brainstorming:
   (byte length of the response body, plus headers if we want a "wire size"
   rather than just body size), thread both through `HttpResponse` and
   `RequestTab`, then render them in the response header row.
-
-## Small UI polish
-
-- Colorize the method dropdown in the URL bar: `METHOD_COLORS` (`src/lib/http.ts`)
-  already exists and is used for the method badge everywhere else (tabs, collection
-  tree rows) — just needs applying to each `SelectItem` label in `UrlBar.tsx`'s method
-  `<Select>`.
 
 ## Variable engine polish (not in original scope)
 
@@ -137,8 +156,7 @@ Design decisions made during brainstorming:
   syntax highlighting, bracket matching, or autocomplete. Likely needs a
   real editor component (e.g. CodeMirror) rather than extending the plain
   textarea further — worth designing deliberately rather than bolting on
-  piecemeal, given the Body tab's own "no syntax highlighting" gap
-  (Collections section above) is the same underlying need.
+  piecemeal.
 - Postman's own `event`/`exec` script arrays aren't mapped on import/export —
   an imported Postman collection's scripts are silently dropped.
 - `ctx.variables.*` alias, mutating the URL or HTTP method from a
