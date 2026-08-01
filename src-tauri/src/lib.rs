@@ -109,7 +109,9 @@ async fn send_request(
     headers: Vec<(String, String)>,
     body: Option<String>,
 ) -> Result<HttpResponse, String> {
-    let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
+    let method = method
+        .parse::<reqwest::Method>()
+        .map_err(|e| e.to_string())?;
 
     let mut request = client.request(method, &url);
     for (name, value) in headers {
@@ -172,7 +174,10 @@ fn save_json<T: Serialize>(app: &tauri::AppHandle, filename: &str, data: &T) -> 
 // Returns `T::default()` (an empty Vec, or an empty PersistedTabsFile) when
 // the file hasn't been written yet, rather than treating a first run as an
 // error.
-fn load_json<T: DeserializeOwned + Default>(app: &tauri::AppHandle, filename: &str) -> Result<T, String> {
+fn load_json<T: DeserializeOwned + Default>(
+    app: &tauri::AppHandle,
+    filename: &str,
+) -> Result<T, String> {
     let path = data_file_path(app, filename)?;
     if !path.exists() {
         return Ok(T::default());
@@ -187,7 +192,14 @@ fn save_tabs(
     active_tab_id: Option<String>,
     tabs: Vec<PersistedTab>,
 ) -> Result<(), String> {
-    save_json(&app, "tabs.json", &PersistedTabsFile { active_tab_id, tabs })
+    save_json(
+        &app,
+        "tabs.json",
+        &PersistedTabsFile {
+            active_tab_id,
+            tabs,
+        },
+    )
 }
 
 #[tauri::command]
