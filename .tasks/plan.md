@@ -92,41 +92,6 @@ Design decisions made during brainstorming:
   resources by ID and break on import elsewhere). This is a deliberate
   advantage to preserve, not an incidental detail.
 
-## Collection run
-
-Goal: batch-execute every request in a collection or folder, top-to-bottom in
-current tree order — Postman's "Collection Runner," scoped down. Distinct
-from Workflows (flows) above: no curated step list, no cross-collection
-chaining, just "run what's already in this collection/folder."
-
-Design decisions made during brainstorming:
-- Trigger from a collection's or folder's context menu ("Run collection" /
-  "Run folder") rather than a new top-level entity like Workflows.
-- Sequential execution only, recursing into nested folders in tree order. No
-  parallelism, no reordering separate from the tree itself.
-- On failure, don't stop the run — execute every request regardless and
-  report pass/fail per request at the end, like Postman's Runner.
-- Runs headlessly against `send_request` rather than opening a tab per
-  request — needs a dedicated results view (list of requests with
-  status/time, expandable per-request detail) rather than reusing
-  `RequestTab`/`ResponseDetails`.
-- Reuses the existing scripting engine as-is for data passing between
-  requests — pre-request/post-response scripts already read/write the
-  active environment via `ctx.environment.get/set`, so a later request in
-  the run sees an earlier request's `ctx.environment.set()` calls with no
-  new mechanism needed. Runs against the currently active environment, same
-  as a normal single send.
-- No data-driven iteration for v1 (no CSV/JSON data file, no repeat-N-times)
-  — a single top-to-bottom pass only. Worth revisiting as a later polish
-  item if it turns out to matter in practice.
-
-Open question, needs deciding before implementation: what counts as
-"failure" for the pass/fail report. The scripting engine has no assertion
-concept (a `pm.test()` equivalent) today — only pre-request/post-response
-side-effect scripts. Simplest v1 definition is "non-2xx status or network
-error," with real assertions deferred; worth confirming that's acceptable
-before designing the results UI around it.
-
 ## Response metadata
 
 - Track and surface response time (ms) and response size (bytes) next to the
