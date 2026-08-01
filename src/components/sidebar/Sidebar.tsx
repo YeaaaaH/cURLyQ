@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { PanelLeftClose } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
-import type { Collection, RequestNode } from "@/lib/collections";
+import type { Collection, CollectionNode, RequestNode } from "@/lib/collections";
 import type { ImportExportLogEntry } from "@/lib/importExportLog";
 import { SidebarSearchAndAdd } from "./SidebarSearchAndAdd";
 import { CollectionsSection } from "./CollectionsSection";
@@ -18,9 +18,11 @@ interface CollectionsProps {
   onExportCollection: (id: string) => void;
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
+  onRunCollection: (id: string) => void;
   onOpenCollectionRequest: (collectionId: string, node: RequestNode) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequestNode: (collectionId: string, parentFolderId: string | null) => string;
+  onRunCollectionNode: (collectionId: string, node: CollectionNode) => void;
   onRenameCollectionNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteCollectionNode: (collectionId: string, nodeId: string) => void;
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
@@ -111,10 +113,12 @@ export const Sidebar = memo(function Sidebar({
             collections={collectionsProps.collections}
             onRenameCollection={collectionsProps.onRenameCollection}
             onDeleteCollection={collectionsProps.onDeleteCollection}
+            onRunCollection={collectionsProps.onRunCollection}
             onExportCollection={collectionsProps.onExportCollection}
             onOpenRequest={collectionsProps.onOpenCollectionRequest}
             onAddFolder={collectionsProps.onAddFolder}
             onAddRequest={collectionsProps.onAddRequestNode}
+            onRunNode={collectionsProps.onRunCollectionNode}
             onRenameNode={collectionsProps.onRenameCollectionNode}
             onDeleteNode={collectionsProps.onDeleteCollectionNode}
             onMoveNode={collectionsProps.onMoveCollectionNode}

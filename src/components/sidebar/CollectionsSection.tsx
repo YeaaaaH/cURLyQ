@@ -1,7 +1,7 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Collection, RequestNode } from "@/lib/collections";
+import type { Collection, CollectionNode, RequestNode } from "@/lib/collections";
 import { CollectionTree } from "@/components/collection-tree/CollectionTree";
 import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
 import { COLLECTIONS_SECTION_OPEN_KEY } from "./constants";
@@ -10,10 +10,12 @@ interface CollectionsSectionProps {
   collections: readonly Collection[];
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
+  onRunCollection: (id: string) => void;
   onExportCollection: (id: string) => void;
   onOpenRequest: (collectionId: string, node: RequestNode) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
+  onRunNode: (collectionId: string, node: CollectionNode) => void;
   onRenameNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteNode: (collectionId: string, nodeId: string) => void;
   onMoveNode: (draggedId: string, targetId: string) => void;
@@ -23,10 +25,12 @@ export function CollectionsSection({
   collections,
   onRenameCollection,
   onDeleteCollection,
+  onRunCollection,
   onExportCollection,
   onOpenRequest,
   onAddFolder,
   onAddRequest,
+  onRunNode,
   onRenameNode,
   onDeleteNode,
   onMoveNode,
@@ -50,10 +54,12 @@ export function CollectionsSection({
             collections={collections}
             onRenameCollection={onRenameCollection}
             onDeleteCollection={onDeleteCollection}
+            onRunCollection={onRunCollection}
             onExportCollection={onExportCollection}
             onOpenRequest={onOpenRequest}
             onAddFolder={onAddFolder}
             onAddRequest={onAddRequest}
+            onRunNode={onRunNode}
             onRenameNode={onRenameNode}
             onDeleteNode={onDeleteNode}
             onMoveNode={onMoveNode}

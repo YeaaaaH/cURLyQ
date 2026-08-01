@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Folder, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Folder, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import type { PendingDelete } from "./types";
 
 interface RenameInputProps {
@@ -109,12 +109,13 @@ export function QuickAddRequestButton({ onClick }: QuickAddRequestButtonProps) {
 interface NodeMenuProps {
   onNewFolder?: () => void;
   onNewRequest?: () => void;
+  onRun?: () => void;
   onRename: () => void;
   onExport?: () => void;
   onDelete: () => void;
 }
 
-export function NodeMenu({ onNewFolder, onNewRequest, onRename, onExport, onDelete }: NodeMenuProps) {
+export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport, onDelete }: NodeMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -140,6 +141,12 @@ export function NodeMenu({ onNewFolder, onNewRequest, onRename, onExport, onDele
           <DropdownMenuItem onClick={onNewRequest}>
             <Plus className="size-3.5" />
             New request
+          </DropdownMenuItem>
+        )}
+        {onRun && (
+          <DropdownMenuItem onClick={onRun}>
+            <Play className="size-3.5" />
+            Run
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={onRename}>

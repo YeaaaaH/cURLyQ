@@ -17,7 +17,10 @@ export interface OutgoingRequest {
 // User-Agent if none was set) applied. Factored out so the "Variables in
 // request" panel's cURL preview shows exactly what would go out, rather than
 // a second computation that could quietly drift from it.
-export function resolveRequest(request: RequestTab, context: VariableLookup): OutgoingRequest {
+export function resolveRequest(
+  request: Pick<RequestTab, "method" | "url" | "params" | "headers" | "body">,
+  context: VariableLookup
+): OutgoingRequest {
   const { method, url, params, headers, body } = request;
 
   let requestUrl: string;
