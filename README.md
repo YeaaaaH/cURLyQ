@@ -1,6 +1,11 @@
 # cURLyQ
 
-A desktop Postman clone — send HTTP requests, inspect responses. Built as a learning project for practicing Claude Code, step by step. See [`project_specs.md`](./project_specs.md) for full v1 scope.
+A desktop HTTP client for sending requests and inspecting responses — a Postman alternative, inspired by it. Built as a learning project for practicing Claude Code, step by step. See [`project_specs.md`](./project_specs.md) for full v1 scope.
+
+<p align="center">
+  <img src="./docs/screenshots/terminal-theme.png" alt="cURLyQ, terminal theme" width="49%">
+  <img src="./docs/screenshots/light-theme.png" alt="cURLyQ, light theme" width="49%">
+</p>
 
 ## Features
 
@@ -8,9 +13,10 @@ A desktop Postman clone — send HTTP requests, inspect responses. Built as a le
 - **Tabs** — multiple requests open at once, persisted across restarts (including which tab and which Params/Headers/Body sub-tab was active).
 - **Environments** — `{{variable}}` substitution across URL/params/headers/body, managed from a dedicated dialog and switched from the sidebar/tab bar.
 - **Collections** — Postman-style nested folders, drag-and-drop reordering and moving (including across collections), rename/delete with a cascade-delete confirmation for non-empty folders.
-- **Import/Export** — environments import/export as Postman v2.1 environment JSON, with a recent-activity log (click an entry for full error details) and toast notifications for success/failure. Collections import/export is planned next.
+- **Import/Export** — environments and collections import/export as Postman v2.1 JSON, with a recent-activity log (click an entry for full error details) and toast notifications for success/failure.
 - **Response viewer** — status, headers, and a pretty-printed body.
 - **Pre-request / post-response scripts** — sandboxed JS scripts per request that can read/write environment variables and (pre-request) tweak headers/body before sending. See [`docs/scripting.md`](./docs/scripting.md).
+- **Themes** — light, dark, and terminal (a CRT-inspired palette), switched from the sidebar and persisted across restarts. A custom titlebar replaces the native OS one so window chrome follows the theme too, not just the app content.
 
 ## Releases
 
@@ -37,7 +43,12 @@ Other useful commands:
 ```sh
 npm run dev      # frontend-only Vite dev server
 cargo check       # type-check the Rust backend (run from src-tauri/)
+cargo fmt         # format the Rust backend (run from src-tauri/)
+cargo clippy      # lint the Rust backend (run from src-tauri/)
+cargo test        # run Rust unit tests (run from src-tauri/)
 ```
+
+`.github/workflows/ci.yml` runs `npm run build`, `cargo fmt --check`, `cargo clippy -D warnings`, and `cargo test` on every PR and push to `master` — worth running these locally before pushing.
 
 ## Recommended IDE Setup
 
