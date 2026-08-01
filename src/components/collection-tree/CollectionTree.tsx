@@ -37,10 +37,12 @@ interface CollectionTreeProps {
   collections: readonly Collection[];
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
+  onRunCollection: (id: string) => void;
   onExportCollection: (id: string) => void;
   onOpenRequest: (collectionId: string, node: RequestNode) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
+  onRunNode: (collectionId: string, node: CollectionNode) => void;
   onRenameNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteNode: (collectionId: string, nodeId: string) => void;
   onMoveNode: (draggedId: string, targetId: string) => void;
@@ -50,10 +52,12 @@ export function CollectionTree({
   collections,
   onRenameCollection,
   onDeleteCollection,
+  onRunCollection,
   onExportCollection,
   onOpenRequest,
   onAddFolder,
   onAddRequest,
+  onRunNode,
   onRenameNode,
   onDeleteNode,
   onMoveNode,
@@ -157,6 +161,7 @@ export function CollectionTree({
     onOpenRequest,
     onAddFolder,
     onAddRequest,
+    onRunNode,
     onRenameNode,
     requestDeleteNode,
     isOpen: treeState.isOpen,
@@ -206,6 +211,7 @@ export function CollectionTree({
               onCancelRename={treeState.cancelRenaming}
               onRenameCollection={onRenameCollection}
               onRequestDeleteCollection={() => requestDeleteCollection(collection)}
+              onRunCollection={onRunCollection}
               onExportCollection={onExportCollection}
               onAddFolder={onAddFolder}
               onAddRequest={onAddRequest}

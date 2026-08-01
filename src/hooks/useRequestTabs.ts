@@ -6,9 +6,8 @@ import { findAllVariableNames, getUnresolvedVariables, resolveRequest } from "@/
 import type { VariableLookup } from "@/lib/variables/context";
 import { buildCurlCommand } from "@/lib/curl";
 import { parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
-import type { HttpResponse } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
-import { runPostResponseScript, runPreRequestScript } from "@/lib/scripting/runScript";
+import { environmentToRecord, sendRequestWithScripts } from "@/lib/requestSend";
 import { toggleLineComment } from "@/lib/textEditing";
 import {
   type PersistedTabsFile,
@@ -28,57 +27,6 @@ import {
   updateCollectionRequestFields,
   updateCollectionRequestMethod,
 } from "@/lib/collections";
-
-// Flattens the active environment's enabled, non-empty-key variables into the
-// plain Record a script sandbox worker can receive via postMessage (a
-// VariableLookup's `.lookup()` closure can't cross that boundary).
-function environmentToRecord(environment: Environment | null): Record<string, string> {
-  const record: Record<string, string> = {};
-  if (!environment) return record;
-  for (const v of environment.variables) {
-    if (v.enabled && v.key.trim() !== "") record[v.key] = v.value;
-  }
-  return record;
-}
-
-function headersToRecord(headers: KeyValuePair[]): Record<string, string> {
-  const record: Record<string, string> = {};
-  for (const h of headers) {
-    if (h.enabled && h.key.trim() !== "") record[h.key] = h.value;
-  }
-  return record;
-}
-
-// Applies a pre-request script's `ctx.request.headers.set` calls onto a
-// header row list: updates a matching key in place, appends a new row for an
-// unseen one. Only ever affects the copy used for this one send — never
-// written back into the tab's own editable Headers rows.
-function applyHeaderPatch(headers: KeyValuePair[], patch: Record<string, string>): KeyValuePair[] {
-  let result = headers;
-  for (const [key, value] of Object.entries(patch)) {
-    const index = result.findIndex((h) => h.key === key);
-    result =
-      index !== -1
-        ? result.map((h, i) => (i === index ? { ...h, value, enabled: true } : h))
-        : [...result, { id: crypto.randomUUID(), key, value, enabled: true }];
-  }
-  return result;
-}
-
-// A pre-request script's ctx.environment.set calls apply to the *stored*
-// environment asynchronously (a React state update), which wouldn't be
-// reflected in `variableContext` until the next render — too late for this
-// same send. Layering the patch in front of the existing lookup gives
-// `resolveRequest` an immediately up-to-date view without waiting on that
-// re-render.
-function withEnvironmentPatch(base: VariableLookup, patch: Record<string, string>): VariableLookup {
-  if (Object.keys(patch).length === 0) return base;
-  return {
-    lookup(name) {
-      return name in patch ? patch[name] : base.lookup(name);
-    },
-  };
-}
 
 interface UseRequestTabsParams {
   variableContext: VariableLookup;
@@ -428,57 +376,28 @@ export function useRequestTabs({
     sendingTabIds.current.add(tabId);
     updateActiveRequest({ error: null, response: null, isSending: true });
 
-    let lastScriptRun = activeRequest.lastScriptRun;
-    let requestForSend = activeRequest;
-    let effectiveContext = variableContext;
-
-    if (activeRequest.preRequestScript.trim() !== "") {
-      const preResult = await runPreRequestScript(
-        activeRequest.preRequestScript,
-        { headers: headersToRecord(activeRequest.headers), body: activeRequest.body },
-        environmentToRecord(activeEnvironment)
-      );
-      lastScriptRun = { ...lastScriptRun, pre: preResult };
-      updateActiveRequest({ lastScriptRun });
-
-      // A broken pre-request script doesn't block the send — it's recorded
-      // as a failure in the Logs tab (same treatment a post-response script
-      // error gets), and the request still goes out with whatever the
-      // script managed to set up before it threw.
-      if (Object.keys(preResult.environmentPatch).length > 0) applyEnvironmentPatch(preResult.environmentPatch);
-      effectiveContext = withEnvironmentPatch(variableContext, preResult.environmentPatch);
-
-      if (preResult.requestPatch) {
-        requestForSend = {
-          ...activeRequest,
-          headers: preResult.requestPatch.headers
-            ? applyHeaderPatch(activeRequest.headers, preResult.requestPatch.headers)
-            : activeRequest.headers,
-          body: preResult.requestPatch.body ?? activeRequest.body,
-        };
+    // A broken pre/post-request script doesn't block the send — it's
+    // recorded as a failure in the Logs tab, and the request still goes out
+    // with whatever the script managed to set up before it threw. Progress
+    // callbacks update the tab as each stage completes (response shown as
+    // soon as it arrives, not held back until the post-response script also
+    // finishes), matching how a single send always behaved.
+    const result = await sendRequestWithScripts(
+      activeRequest,
+      variableContext,
+      environmentToRecord(activeEnvironment),
+      applyEnvironmentPatch,
+      {
+        onPreScriptComplete: (scriptRun) => updateActiveRequest({ lastScriptRun: scriptRun }),
+        onResponse: (response) => updateActiveRequest({ response, isSending: false }),
+        onPostScriptComplete: (scriptRun) => updateActiveRequest({ lastScriptRun: scriptRun }),
       }
+    );
+
+    if (result.error) {
+      updateActiveRequest({ error: result.error, isSending: false });
     }
-
-    const { method, url, headers, body } = resolveRequest(requestForSend, effectiveContext);
-
-    try {
-      const result = await invoke<HttpResponse>("send_request", { method, url, headers, body });
-      updateActiveRequest({ response: result, isSending: false });
-
-      if (activeRequest.postResponseScript.trim() !== "") {
-        const postResult = await runPostResponseScript(
-          activeRequest.postResponseScript,
-          { status: result.status, headers: Object.fromEntries(result.headers), body: result.body },
-          environmentToRecord(activeEnvironment)
-        );
-        updateActiveRequest({ lastScriptRun: { ...lastScriptRun, post: postResult } });
-        if (Object.keys(postResult.environmentPatch).length > 0) applyEnvironmentPatch(postResult.environmentPatch);
-      }
-    } catch (err) {
-      updateActiveRequest({ error: String(err), isSending: false });
-    } finally {
-      sendingTabIds.current.delete(tabId);
-    }
+    sendingTabIds.current.delete(tabId);
   }
 
   return {

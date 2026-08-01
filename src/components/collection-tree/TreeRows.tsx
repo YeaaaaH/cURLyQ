@@ -27,8 +27,19 @@ interface FolderRowProps extends BaseNodeRowProps {
 }
 
 function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
-  const { renamingId, onStartRename, onCancelRename, onAddFolder, onAddRequest, onRenameNode, requestDeleteNode, isOpen, setOpen, isDragActive } =
-    handlers;
+  const {
+    renamingId,
+    onStartRename,
+    onCancelRename,
+    onAddFolder,
+    onAddRequest,
+    onRunNode,
+    onRenameNode,
+    requestDeleteNode,
+    isOpen,
+    setOpen,
+    isDragActive,
+  } = handlers;
   const isRenaming = renamingId === node.id;
   const dnd = useTreeDragAndDrop(node.id, isRenaming);
 
@@ -86,6 +97,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
           <NodeMenu
             onNewFolder={addFolderToFolder}
             onNewRequest={addRequestToFolder}
+            onRun={() => onRunNode(collectionId, node)}
             onRename={() => onStartRename(node.id)}
             onDelete={() => requestDeleteNode(collectionId, node)}
           />
@@ -177,6 +189,7 @@ export interface CollectionRowProps {
   onCancelRename: () => void;
   onRenameCollection: (id: string, name: string) => void;
   onRequestDeleteCollection: () => void;
+  onRunCollection: (id: string) => void;
   onExportCollection: (id: string) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
@@ -192,6 +205,7 @@ export function CollectionRow({
   onCancelRename,
   onRenameCollection,
   onRequestDeleteCollection,
+  onRunCollection,
   onExportCollection,
   onAddFolder,
   onAddRequest,
@@ -246,6 +260,7 @@ export function CollectionRow({
         <NodeMenu
           onNewFolder={addRootFolder}
           onNewRequest={addRootRequest}
+          onRun={() => onRunCollection(collection.id)}
           onRename={() => onStartRename(collection.id)}
           onExport={() => onExportCollection(collection.id)}
           onDelete={onRequestDeleteCollection}

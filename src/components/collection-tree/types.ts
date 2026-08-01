@@ -14,6 +14,7 @@ export interface TreeHandlers {
   onOpenRequest: OpenRequest;
   onAddFolder: AddTreeNode;
   onAddRequest: AddTreeNode;
+  onRunNode: (collectionId: string, node: CollectionNode) => void;
   onRenameNode: RenameNode;
   requestDeleteNode: (collectionId: string, node: CollectionNode) => void;
   isOpen: (id: string, defaultOpen: boolean) => boolean;

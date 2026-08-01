@@ -24,6 +24,7 @@ import { useEdgeDragPanel } from "@/hooks/useEdgeDragPanel";
 import { useEnvironments } from "@/hooks/useEnvironments";
 import { useCollections } from "@/hooks/useCollections";
 import { useRequestTabs } from "@/hooks/useRequestTabs";
+import { useCollectionRun } from "@/hooks/useCollectionRun";
 
 function App() {
   const [importExportLog, setImportExportLog] = useState<ImportExportLogEntry[]>([]);
@@ -58,6 +59,13 @@ function App() {
     onLogEntry,
   });
 
+  const collectionRun = useCollectionRun({
+    collections,
+    variableContext: environments.variableContext,
+    activeEnvironment: environments.activeEnvironment,
+    applyEnvironmentPatch: environments.applyEnvironmentPatch,
+  });
+
   // A drag-to-open sidebar/variables-panel (rather than a click toggle) for
   // browsing many environments/collections or a long variables list at once.
   // Matches Postman's feel: a short pull past a small threshold snaps
@@ -89,9 +97,11 @@ function App() {
       onExportCollection: collectionsApi.handleExportCollection,
       onRenameCollection: collectionsApi.handleRenameCollection,
       onDeleteCollection: collectionsApi.handleDeleteCollection,
+      onRunCollection: collectionRun.handleRunCollection,
       onOpenCollectionRequest: tabs.handleOpenCollectionRequest,
       onAddFolder: collectionsApi.handleAddFolder,
       onAddRequestNode: collectionsApi.handleAddRequestNode,
+      onRunCollectionNode: collectionRun.handleRunNode,
       onRenameCollectionNode: collectionsApi.handleRenameCollectionNode,
       onDeleteCollectionNode: collectionsApi.handleDeleteCollectionNode,
       onMoveCollectionNode: collectionsApi.handleMoveCollectionNode,
@@ -103,9 +113,11 @@ function App() {
       collectionsApi.handleExportCollection,
       collectionsApi.handleRenameCollection,
       collectionsApi.handleDeleteCollection,
+      collectionRun.handleRunCollection,
       tabs.handleOpenCollectionRequest,
       collectionsApi.handleAddFolder,
       collectionsApi.handleAddRequestNode,
+      collectionRun.handleRunNode,
       collectionsApi.handleRenameCollectionNode,
       collectionsApi.handleDeleteCollectionNode,
       collectionsApi.handleMoveCollectionNode,

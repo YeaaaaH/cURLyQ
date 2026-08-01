@@ -148,6 +148,15 @@ export function collectRequestIds(node: CollectionNode): string[] {
   return node.items.flatMap(collectRequestIds);
 }
 
+// Every request node contained in `node`, in tree order — just itself for a
+// request, or every request nested anywhere inside a folder (depth-first,
+// matching the order rows render in the sidebar). Used by a Collection run to
+// gather what it should send.
+export function collectRequestNodes(node: CollectionNode): RequestNode[] {
+  if (node.type === "request") return [node];
+  return node.items.flatMap(collectRequestNodes);
+}
+
 // Every id contained in `node`, including itself — folders and requests
 // alike. Used to sweep a deleted subtree's ids out of the tree's expand
 // state (see useCollectionTreeState.forgetIds) so they don't linger as dead
