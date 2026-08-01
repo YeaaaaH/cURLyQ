@@ -12,6 +12,12 @@ A desktop Postman clone — send HTTP requests, inspect responses. Built as a le
 - **Response viewer** — status, headers, and a pretty-printed body.
 - **Pre-request / post-response scripts** — sandboxed JS scripts per request that can read/write environment variables and (pre-request) tweak headers/body before sending. See [`docs/scripting.md`](./docs/scripting.md).
 
+## Releases
+
+Cross-platform release builds (Windows/macOS/Linux) are produced by a GitHub
+Actions workflow triggered on version tags. See [`docs/releasing.md`](./docs/releasing.md)
+for the process.
+
 ## Stack
 
 - **Frontend**: TypeScript + React, in Tauri's native webview. Styled with Tailwind CSS v4 + shadcn/ui; drag-and-drop via `@dnd-kit`, toasts via `sonner`.
