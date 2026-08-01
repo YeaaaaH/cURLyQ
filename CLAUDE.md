@@ -25,3 +25,9 @@ Scaffolded via `npm create tauri-app` (react-ts template, npm package manager).
 Work step by step, one small piece at a time, with a review checkpoint before moving to the next piece. Do not implement multiple features or large chunks in a single pass unless explicitly asked to.
 
 When introducing a new Rust or JS/TS concept (syntax, pattern, library, tool) for the first time, briefly explain what it is and why it's used here — this project is explicitly for learning, not just shipping.
+
+## Git workflow
+
+`master` is protected by convention — nothing is pushed there directly except release version bumps. Use the `commit` skill (`/commit`) for everything else: it delegates to the `committer` subagent (`.claude/agents/committer.md`), which commits onto a `feature/`/`bug`/`task` branch, pushes it, and opens a PR into `master`. `.github/workflows/ci.yml` runs frontend build, `cargo fmt`/`clippy`/`test`, and a per-OS `cargo check` on every PR and push to `master`.
+
+Cutting a release uses the `release` skill (`/release`) instead — see `docs/releasing.md`. That's the one flow that still commits and pushes straight to `master`, since a version bump isn't code under review and the release tag needs to point at a commit on `master` anyway.
