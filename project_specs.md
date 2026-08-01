@@ -1,6 +1,6 @@
 # cURLyQ — Project Spec (v1)
 
-A desktop Postman clone. Built as a learning project to practice using Claude Code in practice, step by step.
+A desktop HTTP client for sending requests and inspecting responses — a Postman alternative, inspired by it. Built as a learning project to practice using Claude Code in practice, step by step.
 
 ## Stack
 

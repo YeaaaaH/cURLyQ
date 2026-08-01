@@ -8,26 +8,6 @@ here. Keep aligned with `project_specs.md`'s v1 scope.
 running app, then mark it done here (and move a short summary to `done.md`) before
 starting the next.
 
-## CI/CD — cross-platform release builds
-
-Goal: a GitHub Actions workflow that builds the Tauri app for Windows/macOS/Linux and
-attaches installer artifacts (`.msi`/`.exe`, `.dmg`, `.AppImage`/`.deb`) to a GitHub
-Release. Deferred — not blocking other work.
-
-Decisions already made:
-- Trigger on tag push (`v*.*.*`), not every commit to master — releases should be
-  deliberate.
-- Use `tauri-apps/tauri-action` (handles the per-OS build matrix + release upload)
-  rather than hand-rolling it.
-- GitHub-hosted macOS runners produce unsigned builds (Gatekeeper warnings, no Apple
-  Developer cert) — acceptable for now, code-signing is a later decision.
-
-Draft steps: add `.github/workflows/release.yml` matrixed over
-`windows-latest`/`macos-latest`/`ubuntu-latest`, triggered on `v*.*.*` tags; confirm the
-Linux apt package list (`webkit2gtk`, `libayatana-appindicator`, etc.) against
-`tauri-action`'s docs at implementation time; document the release-cutting process
-somewhere discoverable once it exists.
-
 ## Collections
 
 - Duplicate a request or folder.
