@@ -38,8 +38,12 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
   }
 
   function addFolderToFolder() {
-    onStartRename(onAddFolder(collectionId, node.id));
+    const newFolderId = onAddFolder(collectionId, node.id);
+    onStartRename(newFolderId);
     setOpen(node.id, true);
+    // The folder you just made defaults open too, not just its parent — you
+    // made it to put something in it, so you want to see inside right away.
+    setOpen(newFolderId, true);
   }
 
   return (
@@ -86,7 +90,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
             onDelete={() => requestDeleteNode(collectionId, node)}
           />
         </div>
-        <CollapsibleContent className="flex flex-col gap-0.5">
+        <CollapsibleContent className="flex flex-col gap-0.5 overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
           {node.items.length === 0 ? (
             <p className="px-2 py-1 text-xs text-muted-foreground" style={{ paddingLeft: (depth + 1) * TREE_INDENT_PX + EMPTY_LABEL_OFFSET_PX }}>
               Empty
@@ -203,8 +207,10 @@ export function CollectionRow({
   }
 
   function addRootFolder() {
-    onStartRename(onAddFolder(collection.id, null));
+    const newFolderId = onAddFolder(collection.id, null);
+    onStartRename(newFolderId);
     setOpen(collection.id, true);
+    setOpen(newFolderId, true);
   }
 
   return (
@@ -245,7 +251,7 @@ export function CollectionRow({
           onDelete={onRequestDeleteCollection}
         />
       </div>
-      <CollapsibleContent className="flex flex-col gap-0.5 pl-3">
+      <CollapsibleContent className="flex flex-col gap-0.5 overflow-hidden pl-3 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
         {collection.items.length === 0 ? (
           <p className="px-2 py-1 text-xs text-muted-foreground">Empty</p>
         ) : (

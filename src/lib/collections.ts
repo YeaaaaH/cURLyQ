@@ -148,6 +148,15 @@ export function collectRequestIds(node: CollectionNode): string[] {
   return node.items.flatMap(collectRequestIds);
 }
 
+// Every id contained in `node`, including itself — folders and requests
+// alike. Used to sweep a deleted subtree's ids out of the tree's expand
+// state (see useCollectionTreeState.forgetIds) so they don't linger as dead
+// entries.
+export function collectAllNodeIds(node: CollectionNode): string[] {
+  if (node.type === "request") return [node.id];
+  return [node.id, ...node.items.flatMap(collectAllNodeIds)];
+}
+
 // Total folders/requests nested inside `items` (a folder's or collection's
 // own `.items`, not counting the container itself). Used to word a delete
 // confirmation like "contains 2 folders and 5 requests" before a cascading

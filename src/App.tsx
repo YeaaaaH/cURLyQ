@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -69,6 +69,71 @@ function App() {
   // treatment as the rest of its callback props.
   const onCollapseSidebar = useCallback(() => sidebarPanel.setOpen(false), [sidebarPanel.setOpen]);
 
+  // Keyboard equivalent of the edge handle's drag-to-snap gesture — the
+  // handle isn't a continuous resizer (the sidebar's width is fixed; the
+  // drag only decides open vs. closed past a threshold), so this toggles
+  // rather than resizing.
+  const onToggleSidebar = useCallback(() => sidebarPanel.setOpen((open) => !open), [sidebarPanel.setOpen]);
+
+  // Grouped so Sidebar takes one collections-domain prop instead of eleven —
+  // memoized here (not just relying on each field being individually stable)
+  // because an inline object literal would itself be a new identity every
+  // render, which would defeat Sidebar's React.memo just as surely as an
+  // un-memoized callback would.
+  const collectionsProps = useMemo(
+    () => ({
+      collections,
+      onAddCollection: collectionsApi.handleAddCollection,
+      onImportCollection: collectionsApi.handleImportCollection,
+      onExportCollection: collectionsApi.handleExportCollection,
+      onRenameCollection: collectionsApi.handleRenameCollection,
+      onDeleteCollection: collectionsApi.handleDeleteCollection,
+      onOpenCollectionRequest: tabs.handleOpenCollectionRequest,
+      onAddFolder: collectionsApi.handleAddFolder,
+      onAddRequestNode: collectionsApi.handleAddRequestNode,
+      onRenameCollectionNode: collectionsApi.handleRenameCollectionNode,
+      onDeleteCollectionNode: collectionsApi.handleDeleteCollectionNode,
+      onMoveCollectionNode: collectionsApi.handleMoveCollectionNode,
+    }),
+    [
+      collections,
+      collectionsApi.handleAddCollection,
+      collectionsApi.handleImportCollection,
+      collectionsApi.handleExportCollection,
+      collectionsApi.handleRenameCollection,
+      collectionsApi.handleDeleteCollection,
+      tabs.handleOpenCollectionRequest,
+      collectionsApi.handleAddFolder,
+      collectionsApi.handleAddRequestNode,
+      collectionsApi.handleRenameCollectionNode,
+      collectionsApi.handleDeleteCollectionNode,
+      collectionsApi.handleMoveCollectionNode,
+    ]
+  );
+
+  const environmentsProps = useMemo(
+    () => ({
+      environments: environments.environments,
+      activeEnvironmentId: environments.activeEnvironmentId,
+      onSelectEnvironment: environments.setActiveEnvironmentId,
+      onEditEnvironment: environments.openEnvironmentEditor,
+      onAddEnvironment: environments.handleAddEnvironment,
+      onImportEnvironment: environments.handleImportEnvironment,
+      onExportEnvironment: environments.handleExportEnvironment,
+      onDeleteEnvironment: environments.requestDeleteEnvironment,
+    }),
+    [
+      environments.environments,
+      environments.activeEnvironmentId,
+      environments.setActiveEnvironmentId,
+      environments.openEnvironmentEditor,
+      environments.handleAddEnvironment,
+      environments.handleImportEnvironment,
+      environments.handleExportEnvironment,
+      environments.requestDeleteEnvironment,
+    ]
+  );
+
   // A live-resizing window with a docked panel open looks jarring (text
   // rewrapping, the cURL block reflowing) — simplest is to just close
   // whichever panel is open rather than trying to animate through it.
@@ -118,28 +183,11 @@ function App() {
       <Sidebar
         sidebarOpen={sidebarPanel.open}
         onHandlePointerDown={sidebarPanel.onHandlePointerDown}
+        onToggleSidebar={onToggleSidebar}
         onCollapseSidebar={onCollapseSidebar}
-        environments={environments.environments}
-        activeEnvironmentId={environments.activeEnvironmentId}
-        onSelectEnvironment={environments.setActiveEnvironmentId}
-        onEditEnvironment={environments.openEnvironmentEditor}
-        onAddEnvironment={environments.handleAddEnvironment}
-        onImportEnvironment={environments.handleImportEnvironment}
-        onImportCollection={collectionsApi.handleImportCollection}
-        onExportCollection={collectionsApi.handleExportCollection}
-        onExportEnvironment={environments.handleExportEnvironment}
-        onDeleteEnvironment={environments.requestDeleteEnvironment}
         importExportLog={importExportLog}
-        collections={collections}
-        onAddCollection={collectionsApi.handleAddCollection}
-        onRenameCollection={collectionsApi.handleRenameCollection}
-        onDeleteCollection={collectionsApi.handleDeleteCollection}
-        onOpenCollectionRequest={tabs.handleOpenCollectionRequest}
-        onAddFolder={collectionsApi.handleAddFolder}
-        onAddRequestNode={collectionsApi.handleAddRequestNode}
-        onRenameCollectionNode={collectionsApi.handleRenameCollectionNode}
-        onDeleteCollectionNode={collectionsApi.handleDeleteCollectionNode}
-        onMoveCollectionNode={collectionsApi.handleMoveCollectionNode}
+        collectionsProps={collectionsProps}
+        environmentsProps={environmentsProps}
       />
 
       <main

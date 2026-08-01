@@ -33,6 +33,12 @@ export function useEdgeDragPanel(side: "left" | "right") {
         toggled = true;
       }
     }
+    // Locked on `<body>` for the duration of the drag so it doesn't flicker
+    // back to default the moment the pointer leaves the handle's thin strip
+    // (which happens on essentially every drag — that's the gesture).
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = "ew-resize";
+
     // Also ends the drag on pointercancel — without it, an interrupted drag
     // (e.g. losing focus mid-drag) would leave these document listeners
     // attached permanently, stacking more of them on every later attempt.
@@ -40,6 +46,7 @@ export function useEdgeDragPanel(side: "left" | "right") {
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("pointerup", handlePointerEnd);
       document.removeEventListener("pointercancel", handlePointerEnd);
+      document.body.style.cursor = previousCursor;
     }
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerEnd);

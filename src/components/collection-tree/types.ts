@@ -23,6 +23,9 @@ export interface TreeHandlers {
 
 // Explicit, serializable delete-confirmation state — avoids storing a
 // closure (and its captured props/variables) directly in React state.
+// idsToForget is every id in the subtree being deleted (itself included),
+// computed up front so confirmDelete can sweep expand state without needing
+// the original node/collection object back.
 export type PendingDelete =
-  | { type: "collection"; collectionId: string; title: string; description: string }
-  | { type: "node"; collectionId: string; nodeId: string; title: string; description: string };
+  | { type: "collection"; collectionId: string; title: string; description: string; idsToForget: string[] }
+  | { type: "node"; collectionId: string; nodeId: string; title: string; description: string; idsToForget: string[] };

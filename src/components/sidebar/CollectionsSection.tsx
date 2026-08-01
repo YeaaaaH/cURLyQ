@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,8 +6,6 @@ import type { Collection, RequestNode } from "@/lib/collections";
 import { CollectionTree } from "@/components/collection-tree/CollectionTree";
 
 interface CollectionsSectionProps {
-  wrapperRef: RefObject<HTMLDivElement | null>;
-  height: number | null;
   collections: readonly Collection[];
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
@@ -21,8 +19,6 @@ interface CollectionsSectionProps {
 }
 
 export function CollectionsSection({
-  wrapperRef,
-  height,
   collections,
   onRenameCollection,
   onDeleteCollection,
@@ -34,13 +30,16 @@ export function CollectionsSection({
   onDeleteNode,
   onMoveNode,
 }: CollectionsSectionProps) {
+  // Controlled (rather than the Collapsible's own defaultOpen) so the
+  // wrapper's flex-1 can be gated on it below — otherwise collapsing this
+  // section would still leave its wrapper claiming all leftover sidebar
+  // height for nothing, pushing Environments/the log panel down behind a
+  // dead gap instead of the two sections sitting flush together.
+  const [isOpen, setIsOpen] = useState(true);
+
   return (
-    <div
-      ref={wrapperRef}
-      className={cn("flex min-h-0 flex-col", height === null && "flex-1")}
-      style={height !== null ? { height, maxHeight: height, flexShrink: 0 } : undefined}
-    >
-      <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+    <div className={cn("flex min-h-0 flex-col", isOpen && "flex-1")}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex min-h-0 flex-1 flex-col">
         <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
           Collections

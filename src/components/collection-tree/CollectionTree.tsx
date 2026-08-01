@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -6,14 +6,17 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { countNodes, type Collection, type CollectionNode, type RequestNode } from "@/lib/collections";
+import { collectAllNodeIds, countNodes, locateNode, type Collection, type CollectionNode, type RequestNode } from "@/lib/collections";
 import { CollectionRow } from "./TreeRows";
 import { resolveDragPreview, TreeDragOverlay } from "./TreeDragAndDrop";
 import { DeleteConfirmationDialog } from "./TreeControls";
 import { useCollectionTreeState } from "./useCollectionTreeState";
 import type { PendingDelete, TreeHandlers } from "./types";
+
+const DRAG_EXPAND_DWELL_MS = 600;
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -64,6 +67,7 @@ export function CollectionTree({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   function requestDeleteNode(collectionId: string, node: CollectionNode) {
+    const idsToForget = collectAllNodeIds(node);
     if (node.type === "folder" && node.items.length > 0) {
       const counts = countNodes(node.items);
       setPendingDelete({
@@ -72,13 +76,16 @@ export function CollectionTree({
         nodeId: node.id,
         title: `Delete "${node.name}"?`,
         description: `This folder contains ${describeCounts(counts)}. Deleting it will permanently delete everything inside — this can't be undone.`,
+        idsToForget,
       });
       return;
     }
     onDeleteNode(collectionId, node.id);
+    treeState.forgetIds(idsToForget);
   }
 
   function requestDeleteCollection(collection: Collection) {
+    const idsToForget = [collection.id, ...collection.items.flatMap(collectAllNodeIds)];
     if (collection.items.length > 0) {
       const counts = countNodes(collection.items);
       setPendingDelete({
@@ -86,10 +93,12 @@ export function CollectionTree({
         collectionId: collection.id,
         title: `Delete "${collection.name}"?`,
         description: `This collection contains ${describeCounts(counts)}. Deleting it will permanently delete everything inside — this can't be undone.`,
+        idsToForget,
       });
       return;
     }
     onDeleteCollection(collection.id);
+    treeState.forgetIds(idsToForget);
   }
 
   function confirmDelete() {
@@ -99,6 +108,7 @@ export function CollectionTree({
     } else {
       onDeleteNode(pendingDelete.collectionId, pendingDelete.nodeId);
     }
+    treeState.forgetIds(pendingDelete.idsToForget);
     setPendingDelete(null);
   }
 
@@ -108,6 +118,37 @@ export function CollectionTree({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+
+  // Dwell-to-expand: hovering a drag over a closed folder/collection for
+  // DRAG_EXPAND_DWELL_MS opens it, so dropping *into* a collapsed container
+  // doesn't require manually opening it first mid-drag. Only fires for a
+  // container's own droppable id (a "nest inside" target, per
+  // TreeDragAndDrop.tsx) — not the before/end reorder drop-zones, and not a
+  // container that's already open.
+  const dwellTimerRef = useRef<number | null>(null);
+  const dwellTargetIdRef = useRef<string | null>(null);
+
+  function clearDwell() {
+    if (dwellTimerRef.current !== null) {
+      window.clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+    dwellTargetIdRef.current = null;
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const overId = event.over ? String(event.over.id) : null;
+    if (overId === dwellTargetIdRef.current) return;
+    clearDwell();
+    if (overId === null || treeState.isOpen(overId, false)) return;
+
+    const isCollection = collections.some((c) => c.id === overId);
+    const location = isCollection ? null : locateNode(collections as Collection[], overId);
+    if (!isCollection && location?.node.type !== "folder") return;
+
+    dwellTargetIdRef.current = overId;
+    dwellTimerRef.current = window.setTimeout(() => treeState.setOpen(overId, true), DRAG_EXPAND_DWELL_MS);
+  }
 
   const handlers: TreeHandlers = {
     renamingId: treeState.renamingId,
@@ -128,6 +169,7 @@ export function CollectionTree({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    clearDwell();
     setDraggedNodeId(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -142,8 +184,12 @@ export function CollectionTree({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setDraggedNodeId(null)}
+      onDragCancel={() => {
+        clearDwell();
+        setDraggedNodeId(null);
+      }}
     >
       <div className="flex flex-col gap-0.5">
         {collections.length === 0 ? (
