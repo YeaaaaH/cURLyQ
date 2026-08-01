@@ -87,9 +87,16 @@ enum CollectionNode {
         body: String,
         // Absent in collections.json files saved before scripts existed —
         // defaulted for the same reason as PersistedTab's script fields above.
-        #[serde(default)]
+        // Explicit camelCase `rename` (not `rename_all` on the enum, which
+        // only affects the `type` tag's variant names, not field names
+        // within a variant) — without it, this silently round-trips as
+        // `pre_request_script`/`post_response_script` over the IPC
+        // boundary, which the frontend's camelCase `RequestNode` never
+        // matches: every save quietly resets scripts to empty, and every
+        // load leaves them `undefined`.
+        #[serde(default, rename = "preRequestScript")]
         pre_request_script: String,
-        #[serde(default)]
+        #[serde(default, rename = "postResponseScript")]
         post_response_script: String,
     },
 }
@@ -239,8 +246,8 @@ mod collection_node_tests {
                 params: vec![],
                 headers: vec![],
                 body: String::new(),
-                pre_request_script: String::new(),
-                post_response_script: String::new(),
+                pre_request_script: "console.log('pre')".into(),
+                post_response_script: "console.log('post')".into(),
             }],
         };
 
@@ -248,6 +255,12 @@ mod collection_node_tests {
         assert_eq!(json["type"], "folder");
         assert_eq!(json["items"][0]["type"], "request");
         assert_eq!(json["items"][0]["method"], "GET");
+        // Pins the camelCase field names the frontend's `RequestNode` type
+        // actually expects — this exact mismatch (fields round-tripping as
+        // `pre_request_script`/`post_response_script` instead) silently
+        // dropped every saved script and left every loaded one `undefined`.
+        assert_eq!(json["items"][0]["preRequestScript"], "console.log('pre')");
+        assert_eq!(json["items"][0]["postResponseScript"], "console.log('post')");
     }
 
     #[test]
