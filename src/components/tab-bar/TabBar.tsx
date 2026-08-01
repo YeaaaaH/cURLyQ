@@ -2,14 +2,15 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
-import type { RequestTab } from "@/lib/requestTabs";
+import type { Tab } from "@/lib/tabs";
 import { EnvironmentsEditorPopup } from "@/components/EnvironmentsEditorPopup";
 import { RequestTabList } from "./RequestTabList";
 import { EnvironmentSelector } from "./EnvironmentSelector";
 
 interface TabBarProps {
-  requests: readonly RequestTab[];
+  tabs: readonly Tab[];
   activeId: string;
+  dirtyTabIds: ReadonlySet<string>;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onAddTab: () => void;
@@ -30,8 +31,9 @@ interface TabBarProps {
 }
 
 export function TabBar({
-  requests,
+  tabs,
   activeId,
+  dirtyTabIds,
   onSelectTab,
   onCloseTab,
   onAddTab,
@@ -53,7 +55,13 @@ export function TabBar({
   return (
     <>
       <div className="flex shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar px-5 py-3">
-        <RequestTabList requests={requests} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} />
+        <RequestTabList
+          tabs={tabs}
+          activeId={activeId}
+          dirtyTabIds={dirtyTabIds}
+          onSelectTab={onSelectTab}
+          onCloseTab={onCloseTab}
+        />
 
         <Button
           type="button"

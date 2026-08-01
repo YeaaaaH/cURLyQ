@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { type ImportExportLogEntry, pushLogEntry } from "@/lib/importExportLog";
 import type { Collection } from "@/lib/collections";
+import { isRequestTabDirty } from "@/lib/requestTabs";
 import { TitleBar } from "@/components/title-bar/TitleBar";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TabBar } from "@/components/tab-bar/TabBar";
@@ -20,6 +21,7 @@ import { RequestEditor } from "@/components/request-editor/RequestEditor";
 import { VariablesPanel } from "@/components/variables-panel/VariablesPanel";
 import { RequestVariablesTabs } from "@/components/request-variables-tabs/RequestVariablesTabs";
 import { ResponseContainer } from "@/components/response-container/ResponseContainer";
+import { RunResultsView } from "@/components/run-results/RunResultsView";
 import { useEdgeDragPanel } from "@/hooks/useEdgeDragPanel";
 import { useEnvironments } from "@/hooks/useEnvironments";
 import { useCollections } from "@/hooks/useCollections";
@@ -64,7 +66,18 @@ function App() {
     variableContext: environments.variableContext,
     activeEnvironment: environments.activeEnvironment,
     applyEnvironmentPatch: environments.applyEnvironmentPatch,
+    addRunResultTab: tabs.addRunResultTab,
   });
+
+  // Which open tabs have content that isn't actually persisted — url/params/
+  // headers/body/scripts only get written back to a linked collection
+  // request on an explicit Save (unlike name/method, which sync live), so a
+  // tab can look right on screen while what's saved (and what Collection Run
+  // would execute) is stale or, for a never-saved tab, nonexistent.
+  const dirtyTabIds = useMemo(
+    () => new Set(tabs.requests.filter((r) => isRequestTabDirty(r, collections)).map((r) => r.id)),
+    [tabs.requests, collections]
+  );
 
   // A drag-to-open sidebar/variables-panel (rather than a click toggle) for
   // browsing many environments/collections or a long variables list at once.
@@ -159,6 +172,11 @@ function App() {
     return () => window.removeEventListener("resize", handleWindowResize);
   }, [sidebarPanel, variablesPanel]);
 
+  // Always resolves to a real tab — `activeId` only ever points at something
+  // currently in `allTabs` (both request and run-result tab close/select
+  // logic keep that invariant).
+  const activeTab = tabs.allTabs.find((t) => t.id === tabs.activeId)!;
+
   // Shared by every variable-aware field (URL, and header/param values) so
   // each one jumps to the same place instead of each needing its own inline
   // closure.
@@ -213,8 +231,9 @@ function App() {
         )}
       >
         <TabBar
-          requests={tabs.requests}
+          tabs={tabs.allTabs}
           activeId={tabs.activeId}
+          dirtyTabIds={dirtyTabIds}
           onSelectTab={tabs.setActiveId}
           onCloseTab={tabs.handleCloseTab}
           onAddTab={tabs.handleAddTab}
@@ -235,50 +254,56 @@ function App() {
         />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden p-6">
-          <div className="flex shrink-0 flex-col gap-3">
-            <RequestEditor
-              key={tabs.activeRequest.id}
-              activeRequest={tabs.activeRequest}
-              onUpdate={tabs.updateActiveRequest}
-              onCommitName={tabs.handleCommitRequestName}
-              onUpdateMethod={tabs.handleUpdateMethod}
-              onUrlChange={tabs.handleUrlChange}
-              onSend={tabs.handleSend}
-              canSend={tabs.canSend}
-              urlError={tabs.urlError}
-              unresolvedVariables={tabs.unresolvedVariables}
-              onSaveInPlace={tabs.handleSaveActiveRequestInPlace}
-              collections={collections}
-              onAddCollection={collectionsApi.handleAddCollection}
-              onConfirmSaveTo={tabs.handleConfirmSaveTo}
-              activeEnvironment={environments.activeEnvironment}
-              variableContext={environments.variableContext}
-              onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
-              onOpenEnvironment={handleOpenEnvironment}
-              onOpenVariablesPanel={handleOpenVariablesPanel}
-            />
-          </div>
+          {activeTab.type === "run-result" ? (
+            <RunResultsView tab={activeTab} />
+          ) : (
+            <>
+              <div className="flex shrink-0 flex-col gap-3">
+                <RequestEditor
+                  key={tabs.activeRequest.id}
+                  activeRequest={tabs.activeRequest}
+                  onUpdate={tabs.updateActiveRequest}
+                  onCommitName={tabs.handleCommitRequestName}
+                  onUpdateMethod={tabs.handleUpdateMethod}
+                  onUrlChange={tabs.handleUrlChange}
+                  onSend={tabs.handleSend}
+                  canSend={tabs.canSend}
+                  urlError={tabs.urlError}
+                  unresolvedVariables={tabs.unresolvedVariables}
+                  onSaveInPlace={tabs.handleSaveActiveRequestInPlace}
+                  collections={collections}
+                  onAddCollection={collectionsApi.handleAddCollection}
+                  onConfirmSaveTo={tabs.handleConfirmSaveTo}
+                  activeEnvironment={environments.activeEnvironment}
+                  variableContext={environments.variableContext}
+                  onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+                  onOpenEnvironment={handleOpenEnvironment}
+                  onOpenVariablesPanel={handleOpenVariablesPanel}
+                />
+              </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-5">
-            <RequestVariablesTabs
-              key={tabs.activeRequest.id}
-              activeRequest={tabs.activeRequest}
-              onUpdate={tabs.updateActiveRequest}
-              updateParam={tabs.updateParam}
-              removeParam={tabs.removeParam}
-              updateHeader={tabs.updateHeader}
-              removeHeader={tabs.removeHeader}
-              onBodyKeyDown={tabs.handleBodyKeyDown}
-              bodyError={tabs.bodyError}
-              activeEnvironment={environments.activeEnvironment}
-              variableContext={environments.variableContext}
-              onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
-              onOpenEnvironment={handleOpenEnvironment}
-              onOpenVariablesPanel={handleOpenVariablesPanel}
-            />
+              <div className="flex min-h-0 flex-1 flex-col gap-5">
+                <RequestVariablesTabs
+                  key={tabs.activeRequest.id}
+                  activeRequest={tabs.activeRequest}
+                  onUpdate={tabs.updateActiveRequest}
+                  updateParam={tabs.updateParam}
+                  removeParam={tabs.removeParam}
+                  updateHeader={tabs.updateHeader}
+                  removeHeader={tabs.removeHeader}
+                  onBodyKeyDown={tabs.handleBodyKeyDown}
+                  bodyError={tabs.bodyError}
+                  activeEnvironment={environments.activeEnvironment}
+                  variableContext={environments.variableContext}
+                  onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+                  onOpenEnvironment={handleOpenEnvironment}
+                  onOpenVariablesPanel={handleOpenVariablesPanel}
+                />
 
-            <ResponseContainer error={tabs.activeRequest.error} response={tabs.activeRequest.response} />
-          </div>
+                <ResponseContainer error={tabs.activeRequest.error} response={tabs.activeRequest.response} />
+              </div>
+            </>
+          )}
         </div>
       </main>
 

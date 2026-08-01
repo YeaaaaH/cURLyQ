@@ -3,6 +3,49 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Collection run (2026-08-02)
+
+Postman-"Collection Runner"-style batch execution: "Run" on a folder or collection's
+context menu sequentially sends every request nested under it, in tree order, continuing
+past failures rather than stopping (`runCollectionRequests`, `src/lib/collectionRun.ts`).
+"Failure" is deliberately simple for v1 — non-2xx status or a network error — since the
+scripting engine has no assertion API yet. Chaining between steps reuses the scripting
+engine as-is: an accumulated patch of every `ctx.environment.set()` call so far in the
+run is layered onto the active environment for each later step, both for variable
+substitution and for what a step's own scripts see via `ctx.environment.get()` — the
+live environment state alone wouldn't reflect an earlier step's patch mid-run, since
+committing it to React state is an async update the run loop doesn't wait on.
+
+Results open as their own tab in the same strip as request tabs (`RunResultTab`, a
+`Tab = RequestTab | RunResultTab` union in `src/lib/tabs.ts`) rather than a separate
+view — ephemeral, never persisted, since a run result is a snapshot of a past action.
+Each row is expandable into the exact same `ResponseContainer`/`ScriptLogsPanel`
+components a single request tab already uses, reused as-is rather than reimplemented;
+the script-logs sub-section only auto-opens when a script actually ran for that request,
+since most don't have one.
+
+The send pipeline itself (`sendRequestWithScripts`, `src/lib/requestSend.ts`) was
+extracted out of `useRequestTabs`'s `handleSend` as a reusable, tab-independent function
+first, so both a live tab's Send button and the headless run engine share one
+implementation instead of two.
+
+Also added along the way: an unsaved-changes indicator (a dot on a tab's name) for any
+request tab whose url/params/headers/body/scripts differ from what's actually
+persisted — discovered as a real gap during testing, since Collection Run reads the
+persisted collection tree, not open tabs, so an unsaved edit would silently run stale.
+Deliberately excludes name/method from the comparison, since those already sync to the
+collection live on every change unlike the rest, which only write back on an explicit
+Save.
+
+Fixed a real pre-existing bug found along the way: `CollectionNode::Request`'s
+`pre_request_script`/`post_response_script` fields (`src-tauri/src/lib.rs`) had
+`#[serde(default)]` but no camelCase rename, unlike `PersistedTab`, which correctly has
+one — a `rename_all` on a `#[serde(tag = "type")]` enum only affects variant tag names,
+not field names within a variant. Every `save_collections` call had been silently
+resetting saved scripts to `""` (the JSON keys never matched), and every `load_collections`
+left `preRequestScript`/`postResponseScript` `undefined` in JS. No data was actually lost
+by the fix, since nothing had ever round-tripped correctly in the first place.
+
 ## CI/CD — cross-platform release builds (2026-08-01)
 
 Two workflows: `.github/workflows/ci.yml` (PRs + pushes to `master` — frontend

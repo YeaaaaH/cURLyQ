@@ -27,6 +27,8 @@ import {
   updateCollectionRequestFields,
   updateCollectionRequestMethod,
 } from "@/lib/collections";
+import { type RunResultTab, type Tab, createRunResultTab } from "@/lib/tabs";
+import type { CollectionRunResult } from "@/lib/collectionRun";
 
 interface UseRequestTabsParams {
   variableContext: VariableLookup;
@@ -43,7 +45,23 @@ export function useRequestTabs({
 }: UseRequestTabsParams) {
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
   const [activeId, setActiveId] = useState(() => requests[0].id);
-  const activeRequest = requests.find((r) => r.id === activeId)!;
+
+  // Run results (Collection Run) open in the same strip as request tabs but
+  // are never persisted — a run result is a snapshot of a past action, not
+  // an editable document. Kept as a separate array rather than merged into
+  // `requests` itself, so `requests`/`setRequests` stay exactly RequestTab[]
+  // everywhere else in this hook; `allTabs` below is the merged view the tab
+  // strip actually renders.
+  const [runResultTabs, setRunResultTabs] = useState<RunResultTab[]>([]);
+  const allTabs = useMemo<Tab[]>(() => [...requests, ...runResultTabs], [requests, runResultTabs]);
+
+  // Falls back to the first request tab when `activeId` currently points at
+  // a run-result tab — every computation below (urlError, curlCommand,
+  // handleSend, etc.) needs *some* real RequestTab to operate on even though
+  // its result won't be shown while a run-result tab is what's displayed
+  // (App.tsx only renders the request-editing UI when the active tab's type
+  // is "request").
+  const activeRequest = requests.find((r) => r.id === activeId) ?? requests[0];
 
   // Mirrors `requests` for the handlers below that need the *current* tab
   // list but are also passed down to a `React.memo`'d Sidebar
@@ -113,6 +131,7 @@ export function useRequestTabs({
 
   const openCollectionRequestTab = useCallback((collectionId: string, node: RequestNode) => {
     const tab: RequestTab = {
+      type: "request",
       id: crypto.randomUUID(),
       name: node.name,
       method: node.method,
@@ -226,6 +245,18 @@ export function useRequestTabs({
   }
 
   function handleCloseTab(id: string) {
+    // Run-result tabs live in a separate array (see `runResultTabs` above) —
+    // closing one never needs the "keep at least one" fallback a request
+    // tab does, since there's always at least one request tab regardless.
+    if (runResultTabs.some((r) => r.id === id)) {
+      const remaining = runResultTabs.filter((r) => r.id !== id);
+      setRunResultTabs(remaining);
+      if (id === activeId) {
+        setActiveId(remaining.length > 0 ? remaining[remaining.length - 1].id : requests[requests.length - 1].id);
+      }
+      return;
+    }
+
     const closingIndex = requests.findIndex((r) => r.id === id);
     const remaining = requests.filter((r) => r.id !== id);
 
@@ -242,6 +273,15 @@ export function useRequestTabs({
       setActiveId(remaining[newActiveIndex].id);
     }
   }
+
+  // Opens a finished Collection Run's results as a new tab, focused
+  // immediately — same "just landed, look at it now" behavior as opening a
+  // saved request.
+  const addRunResultTab = useCallback((label: string, result: CollectionRunResult) => {
+    const tab = createRunResultTab(label, result);
+    setRunResultTabs((prev) => [...prev, tab]);
+    setActiveId(tab.id);
+  }, []);
 
   const updateParam = useCallback(
     (index: number, patch: Partial<KeyValuePair>) => {
@@ -402,6 +442,7 @@ export function useRequestTabs({
 
   return {
     requests,
+    allTabs,
     activeId,
     setActiveId,
     activeRequest,
@@ -415,6 +456,7 @@ export function useRequestTabs({
     handleConfirmSaveTo,
     handleAddTab,
     handleCloseTab,
+    addRunResultTab,
     updateParam,
     removeParam,
     updateHeader,
