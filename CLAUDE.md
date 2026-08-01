@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-cURLyQ is a desktop Postman clone (send HTTP requests with headers/params/body, view responses), built as a learning project — see `project_specs.md` for full v1 scope and what's explicitly out of scope.
+cURLyQ is a desktop HTTP client (send HTTP requests with headers/params/body, view responses) — a Postman alternative, inspired by it — built as a learning project. See `project_specs.md` for full v1 scope and what's explicitly out of scope.
 
 ## Stack
 

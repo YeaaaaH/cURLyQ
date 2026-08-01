@@ -3,6 +3,38 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## CI/CD — cross-platform release builds (2026-08-01)
+
+Two workflows: `.github/workflows/ci.yml` (PRs + pushes to `master` — frontend
+build, `cargo fmt`/`clippy -D warnings`/`cargo test`, then a lightweight
+per-OS `cargo check` matrix to catch OS-specific breakage without redoing
+full installer packaging) and `.github/workflows/release.yml` (tag-triggered
+on `v*.*.*`, builds via `tauri-apps/tauri-action` across
+windows-latest/ubuntu-22.04/macos-latest, uploading to a **draft** GitHub
+Release you publish by hand). Non-obvious: macOS Intel + Apple Silicon are
+both built by cross-compiling `--target x86_64-apple-darwin`/
+`aarch64-apple-darwin` on the same `macos-latest` (ARM) runner — no literal
+Intel runner needed, since Rust cross-target linking doesn't execute target
+code at build time. Ubuntu 22.04 is a hard floor, not an arbitrary choice —
+Tauri v2 requires WebKitGTK 4.1, which Ubuntu 20.04's repos don't ship at
+all, and GitHub also retired the `ubuntu-20.04` hosted runner in April 2025.
+Renamed `productName` in `tauri.conf.json` from the npm-scaffold default
+`"tauri-app"` to `"cURLyQ"` so installer filenames are correct. Process
+documented in `docs/releasing.md`; automated via the `/release` skill
+(version bump across `tauri.conf.json`/`package.json`/`Cargo.toml`, sync
+`Cargo.lock`, confirm, tag, push — the one flow that still pushes straight
+to `master`, since it's mechanical and the tag has to point at a `master`
+commit anyway).
+
+Landed alongside a git workflow change: `master` is now protected by
+convention (not yet server-side) — the `/commit` skill's `committer`
+subagent creates/reuses a `feature/`/`bug`/`task` branch, pushes it, and
+opens a PR via `gh pr create` instead of pushing directly. Verified
+end-to-end: two PRs went through the new flow with `ci.yml` running for
+real on the first one, and `v0.1.0` was tagged and built successfully across
+all four platform legs (`.msi`/NSIS `.exe`, two `.dmg`s, `.deb`/`.AppImage`/
+`.rpm`) as the first real release.
+
 ## Pre-request / post-response scripts (2026-07-31)
 
 Scripts run in an isolated Web Worker (`src/lib/scripting/`) via
