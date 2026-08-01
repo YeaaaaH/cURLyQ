@@ -3,7 +3,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, Download, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
-import { CAPPED_LIST_MAX_HEIGHT_PX } from "./constants";
+import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
+import { CAPPED_LIST_MAX_HEIGHT_PX, ENVIRONMENTS_SECTION_OPEN_KEY } from "./constants";
 
 interface EnvironmentRowProps {
   environment: Environment;
@@ -79,8 +80,10 @@ export function EnvironmentsSection({
   onExportEnvironment,
   onDeleteEnvironment,
 }: EnvironmentsSectionProps) {
+  const [isOpen, setIsOpen] = usePersistedBoolean(ENVIRONMENTS_SECTION_OPEN_KEY, true);
+
   return (
-    <Collapsible defaultOpen className="flex shrink-0 flex-col">
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex shrink-0 flex-col">
       <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
         Environments

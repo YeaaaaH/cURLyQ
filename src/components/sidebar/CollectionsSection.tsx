@@ -1,9 +1,10 @@
-import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Collection, RequestNode } from "@/lib/collections";
 import { CollectionTree } from "@/components/collection-tree/CollectionTree";
+import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
+import { COLLECTIONS_SECTION_OPEN_KEY } from "./constants";
 
 interface CollectionsSectionProps {
   collections: readonly Collection[];
@@ -35,7 +36,7 @@ export function CollectionsSection({
   // section would still leave its wrapper claiming all leftover sidebar
   // height for nothing, pushing Environments/the log panel down behind a
   // dead gap instead of the two sections sitting flush together.
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = usePersistedBoolean(COLLECTIONS_SECTION_OPEN_KEY, true);
 
   return (
     <div className={cn("flex min-h-0 flex-col", isOpen && "flex-1")}>
