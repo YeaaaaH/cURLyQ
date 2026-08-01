@@ -141,6 +141,48 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+.theme-terminal {
+    --background: #0a0d0a;
+    --foreground: #c9d6cb;
+    --card: #0a0d0a;
+    --card-foreground: #c9d6cb;
+    --popover: #0a0d0a;
+    --popover-foreground: #c9d6cb;
+    --primary: #39ff88;
+    --primary-foreground: #06120a;
+    --secondary: #141c17;
+    --secondary-foreground: #eafff0;
+    --muted: #141c17;
+    --muted-foreground: #7c9483;
+    --accent: #141c17;
+    --accent-foreground: #eafff0;
+    --destructive: #ff5f56;
+    --border: #212b23;
+    --input: #212b23;
+    --ring: #39ff88;
+    --ring-glow: rgba(57, 255, 136, 0.35);
+    --success: #39ff88;
+    --variable-resolved: #5ec8ff;
+    --drop-indicator: #ffcc00;
+    --elevation-sm: none;
+    --elevation-md: none;
+    --method-get: #39ff88;
+    --method-post: #ffcc00;
+    --method-put: #5ec8ff;
+    --method-patch: #d68aff;
+    --method-delete: #ff5f56;
+    --radius: 0px;
+    --sidebar: #0c100d;
+    --sidebar-foreground: #c9d6cb;
+    --sidebar-primary: #39ff88;
+    --sidebar-primary-foreground: #06120a;
+    --sidebar-accent: #141c17;
+    --sidebar-accent-foreground: #eafff0;
+    --sidebar-border: #212b23;
+    --sidebar-ring: #39ff88;
+    --font-sans: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
 /* App layout tokens — not part of the shadcn-generated theme above, same
    value in light and dark. */
 :root {

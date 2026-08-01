@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,16 +8,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Moon, Palette, SquareTerminal, Sun } from "lucide-react";
+import { useTheme, type ThemeName } from "@/components/ThemeProvider";
 
-// Preview only: not persisted yet, no real switcher mechanism behind it —
-// just proves the token setup by actually toggling the existing `.dark` class.
+// Not persisted yet — resets to light on reload.
 export function ThemeSwitcher() {
-  const [theme, setTheme] = useState<"light" | "dark" | "terminal">("light");
+  const { theme, setTheme } = useTheme();
 
   function handleThemeChange(value: string) {
-    const next = value as "light" | "dark" | "terminal";
-    setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    setTheme(value as ThemeName);
   }
 
   return (
@@ -39,10 +36,9 @@ export function ThemeSwitcher() {
             <Moon className="size-3.5" />
             Dark
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="terminal" disabled>
+          <DropdownMenuRadioItem value="terminal">
             <SquareTerminal className="size-3.5" />
             Terminal
-            <span className="ml-auto text-xs text-muted-foreground">Soon</span>
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
