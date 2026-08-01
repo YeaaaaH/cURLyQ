@@ -171,7 +171,13 @@ export function VariableAwareTextarea({
           // browser's own document-wide selection independent of the real
           // textarea's own selectionStart/selectionEnd.
           "pointer-events-none absolute inset-0 h-full w-full overflow-hidden text-foreground whitespace-pre-wrap break-words select-none",
-          className
+          className,
+          // Always wins the tailwind-merge conflict below, no matter what
+          // background utility `className` carries — see VariableAwareInput
+          // for why the overlay must stay transparent (it's stacked
+          // directly on top of the real textarea and would otherwise hide
+          // its native blinking caret).
+          "bg-transparent"
         )}
       >
         {renderOverlaySegments(value, tokens)}

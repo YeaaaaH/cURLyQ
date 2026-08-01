@@ -186,7 +186,13 @@ export function VariableAwareInput({
           // independent of and inconsistent with the real input's own
           // selectionStart/selectionEnd that drives the highlighting above.
           "pointer-events-none absolute inset-0 overflow-hidden rounded-lg border border-transparent px-2.5 py-1 text-sm whitespace-pre select-none",
-          className
+          className,
+          // Always wins the tailwind-merge conflict below, no matter what
+          // background utility `className` carries (e.g. KeyValueEditor's
+          // `bg-card`): the overlay must stay transparent since it's
+          // stacked directly on top of the real input, or it paints over
+          // and hides that input's native blinking caret.
+          "bg-transparent"
         )}
       >
         {renderOverlaySegments(value, tokens)}
