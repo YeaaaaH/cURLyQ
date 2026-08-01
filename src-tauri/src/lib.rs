@@ -260,7 +260,10 @@ mod collection_node_tests {
         // `pre_request_script`/`post_response_script` instead) silently
         // dropped every saved script and left every loaded one `undefined`.
         assert_eq!(json["items"][0]["preRequestScript"], "console.log('pre')");
-        assert_eq!(json["items"][0]["postResponseScript"], "console.log('post')");
+        assert_eq!(
+            json["items"][0]["postResponseScript"],
+            "console.log('post')"
+        );
     }
 
     #[test]
