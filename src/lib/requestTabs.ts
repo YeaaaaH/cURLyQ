@@ -4,6 +4,7 @@ import type { VariableLookup } from "@/lib/variables/context";
 import { VARIABLE_PATTERN } from "@/lib/variables/tokenizer";
 import { substituteVariables } from "@/lib/variables/resolver";
 import type { ScriptHalf, ScriptRunResult } from "@/lib/scripting/types";
+import { type Collection, findCollectionNode } from "@/lib/collections";
 
 export type SubTab = "params" | "headers" | "body" | "scripts";
 
@@ -30,6 +31,7 @@ export function createEmptyScriptRun(): LastScriptRun {
 export type ScriptsSubTab = ScriptHalf | "logs";
 
 export interface RequestTab {
+  type: "request";
   id: string;
   name: string;
   method: string;
@@ -58,6 +60,7 @@ export interface RequestTab {
 
 export function createRequestTab(): RequestTab {
   return {
+    type: "request",
     id: crypto.randomUUID(),
     name: "Untitled request",
     method: "GET",
@@ -138,6 +141,7 @@ export function toPersistedTab(tab: RequestTab): PersistedTab {
 
 export function fromPersistedTab(saved: PersistedTab): RequestTab {
   return {
+    type: "request",
     ...saved,
     params: ensureTrailingBlankRow(saved.params),
     headers: ensureTrailingBlankRow(saved.headers),
@@ -260,4 +264,41 @@ export function getBodyError(body: string, context: VariableLookup): string | nu
   } catch {
     return "Body is not valid JSON";
   }
+}
+
+function sameRows(a: KeyValuePair[], b: KeyValuePair[]): boolean {
+  const strippedA = stripEmptyRows(a);
+  const strippedB = stripEmptyRows(b);
+  if (strippedA.length !== strippedB.length) return false;
+  return strippedA.every(
+    (row, i) => row.key === strippedB[i].key && row.value === strippedB[i].value && row.enabled === strippedB[i].enabled
+  );
+}
+
+// Whether `tab`'s content differs from what's actually persisted — the URL,
+// params, headers, body, and scripts only ever get written back to a linked
+// collection request on an explicit Save (unlike name/method, which sync
+// live on every change), so a tab can look correct on screen while what
+// Collection Run would actually execute is stale or, for a never-saved tab,
+// nonexistent. Compares against a blank baseline when there's no linked
+// (or no longer findable) saved request, so a fresh tab with typed-in
+// content that was never saved anywhere also counts as dirty.
+export function isRequestTabDirty(tab: RequestTab, collections: Collection[]): boolean {
+  const savedNode =
+    tab.sourceCollectionId && tab.sourceRequestId
+      ? findCollectionNode(collections, tab.sourceCollectionId, tab.sourceRequestId)
+      : null;
+  const baseline =
+    savedNode && savedNode.type === "request"
+      ? savedNode
+      : { url: "", params: [] as KeyValuePair[], headers: [] as KeyValuePair[], body: "", preRequestScript: "", postResponseScript: "" };
+
+  return (
+    tab.url !== baseline.url ||
+    tab.body !== baseline.body ||
+    tab.preRequestScript !== baseline.preRequestScript ||
+    tab.postResponseScript !== baseline.postResponseScript ||
+    !sameRows(tab.params, baseline.params) ||
+    !sameRows(tab.headers, baseline.headers)
+  );
 }

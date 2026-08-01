@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { METHOD_COLORS } from "@/lib/http";
-import type { RequestTab } from "@/lib/requestTabs";
-import { X } from "lucide-react";
+import type { Tab } from "@/lib/tabs";
+import { ListChecks, X } from "lucide-react";
 
 interface RequestTabItemProps {
-  tab: RequestTab;
+  tab: Tab;
   active: boolean;
+  dirty: boolean;
   onSelect: () => void;
   onClose: () => void;
   // React 19 lets a function component accept `ref` as a plain prop —
@@ -14,7 +15,8 @@ interface RequestTabItemProps {
   ref?: React.Ref<HTMLDivElement>;
 }
 
-function RequestTabItem({ tab, active, onSelect, onClose, ref }: RequestTabItemProps) {
+function RequestTabItem({ tab, active, dirty, onSelect, onClose, ref }: RequestTabItemProps) {
+  const name = tab.type === "request" ? tab.name : tab.label;
   return (
     <div
       ref={ref}
@@ -31,15 +33,27 @@ function RequestTabItem({ tab, active, onSelect, onClose, ref }: RequestTabItemP
           : "border border-transparent bg-transparent text-muted-foreground hover:text-foreground"
       )}
     >
-      <span className={cn("text-xs font-semibold", METHOD_COLORS[tab.method])}>{tab.method}</span>
-      <span className={active ? "text-foreground" : undefined}>{tab.name}</span>
+      {tab.type === "request" ? (
+        <span className={cn("text-xs font-semibold", METHOD_COLORS[tab.method])}>{tab.method}</span>
+      ) : (
+        <ListChecks className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <span className={active ? "text-foreground" : undefined}>{name}</span>
+      {dirty && (
+        <span
+          className="size-1.5 shrink-0 rounded-full bg-muted-foreground/70"
+          role="img"
+          aria-label="Unsaved changes"
+          title="Unsaved changes"
+        />
+      )}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        aria-label={`Close ${tab.name}`}
+        aria-label={`Close ${name}`}
         className="rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
       >
         <X className="size-3" />
@@ -49,13 +63,14 @@ function RequestTabItem({ tab, active, onSelect, onClose, ref }: RequestTabItemP
 }
 
 interface RequestTabListProps {
-  requests: readonly RequestTab[];
+  tabs: readonly Tab[];
   activeId: string;
+  dirtyTabIds: ReadonlySet<string>;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
 }
 
-export function RequestTabList({ requests, activeId, onSelectTab, onCloseTab }: RequestTabListProps) {
+export function RequestTabList({ tabs, activeId, dirtyTabIds, onSelectTab, onCloseTab }: RequestTabListProps) {
   // The tab strip scrolls horizontally once there are more tabs than fit —
   // switching the active tab programmatically (e.g. clicking a request in
   // the collection tree that's already open) previously left it selected but
@@ -82,12 +97,13 @@ export function RequestTabList({ requests, activeId, onSelectTab, onCloseTab }: 
 
   return (
     <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto" onWheel={handleWheel}>
-      {requests.map((tab) => (
+      {tabs.map((tab) => (
         <RequestTabItem
           key={tab.id}
           ref={(element) => registerTabElement(tab.id, element)}
           tab={tab}
           active={tab.id === activeId}
+          dirty={dirtyTabIds.has(tab.id)}
           onSelect={() => onSelectTab(tab.id)}
           onClose={() => onCloseTab(tab.id)}
         />

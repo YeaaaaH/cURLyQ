@@ -3,23 +3,22 @@ import { toast } from "sonner";
 import type { VariableLookup } from "@/lib/variables/context";
 import type { Environment } from "@/lib/environments";
 import { type Collection, type CollectionNode, type RequestNode, collectRequestNodes } from "@/lib/collections";
-import { runCollectionRequests } from "@/lib/collectionRun";
+import { runCollectionRequests, type CollectionRunResult } from "@/lib/collectionRun";
 
 interface UseCollectionRunParams {
   collections: Collection[];
   variableContext: VariableLookup;
   activeEnvironment: Environment | null;
   applyEnvironmentPatch: (patch: Record<string, string>) => void;
+  addRunResultTab: (label: string, result: CollectionRunResult) => void;
 }
 
-// Placeholder reporting via toast, until a dedicated results tab exists to
-// show per-request detail (planned as a follow-up piece — see
-// .tasks/plan.md's "Collection run" section).
 export function useCollectionRun({
   collections,
   variableContext,
   activeEnvironment,
   applyEnvironmentPatch,
+  addRunResultTab,
 }: UseCollectionRunParams) {
   const runAndReport = useCallback(
     async (requests: RequestNode[], label: string) => {
@@ -28,18 +27,9 @@ export function useCollectionRun({
         return;
       }
       const result = await runCollectionRequests(requests, variableContext, activeEnvironment, applyEnvironmentPatch);
-      const summary = `${result.passed}/${result.steps.length} passed`;
-      if (result.failed === 0) {
-        toast.success(`Ran "${label}" — ${summary}`);
-      } else {
-        const failedNames = result.steps
-          .filter((s) => !s.ok)
-          .map((s) => s.requestName)
-          .join(", ");
-        toast.error(`Ran "${label}" — ${summary}`, { description: `Failed: ${failedNames}` });
-      }
+      addRunResultTab(label, result);
     },
-    [variableContext, activeEnvironment, applyEnvironmentPatch]
+    [variableContext, activeEnvironment, applyEnvironmentPatch, addRunResultTab]
   );
 
   const handleRunCollection = useCallback(
