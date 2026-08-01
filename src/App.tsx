@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { type ImportExportLogEntry, pushLogEntry } from "@/lib/importExportLog";
 import type { Collection } from "@/lib/collections";
+import { TitleBar } from "@/components/title-bar/TitleBar";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TabBar } from "@/components/tab-bar/TabBar";
 import { RequestEditor } from "@/components/request-editor/RequestEditor";
@@ -180,6 +181,8 @@ function App() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <TitleBar />
+
       <Sidebar
         sidebarOpen={sidebarPanel.open}
         onHandlePointerDown={sidebarPanel.onHandlePointerDown}
@@ -192,7 +195,7 @@ function App() {
 
       <main
         className={cn(
-          "flex h-screen flex-col overflow-hidden transition-[margin-left,margin-right] duration-150",
+          "mt-8 flex h-[calc(100vh-2rem)] flex-col overflow-hidden transition-[margin-left,margin-right] duration-150",
           sidebarPanel.open ? "ml-[max(16vw,180px)]" : "ml-0",
           variablesPanel.open ? "mr-[max(16vw,280px)]" : "mr-0"
         )}

@@ -77,7 +77,7 @@ export const Sidebar = memo(function Sidebar({
         // invisible, instead of leaving them silently tabbable at zero width.
         inert={!sidebarOpen}
         className={cn(
-          "fixed inset-y-0 left-0 z-30 overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-150",
+          "fixed top-8 bottom-0 left-0 z-30 overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-150",
           sidebarOpen ? "w-[var(--app-sidebar-width)]" : "w-0"
         )}
       >
@@ -143,7 +143,7 @@ export const Sidebar = memo(function Sidebar({
         aria-expanded={sidebarOpen}
         aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
         className={cn(
-          "fixed inset-y-0 z-40 w-1 cursor-ew-resize touch-none outline-none hover:bg-foreground/20 focus-visible:ring-3 focus-visible:ring-ring-glow",
+          "fixed top-8 bottom-0 z-40 w-1 cursor-ew-resize touch-none outline-none hover:bg-foreground/20 focus-visible:ring-3 focus-visible:ring-ring-glow",
           sidebarOpen ? "left-[var(--app-sidebar-width)]" : "left-0"
         )}
       />

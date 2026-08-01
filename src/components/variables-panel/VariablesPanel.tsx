@@ -37,7 +37,7 @@ export function VariablesPanel({
     <>
       <div
         className={cn(
-          "fixed inset-y-0 right-0 z-30 overflow-hidden border-l border-sidebar-border bg-sidebar transition-[width] duration-150",
+          "fixed top-8 bottom-0 right-0 z-30 overflow-hidden border-l border-sidebar-border bg-sidebar transition-[width] duration-150",
           open ? "w-[max(16vw,280px)]" : "w-0"
         )}
       >
