@@ -2,7 +2,8 @@
 
 All open/planned work for cURLyQ lives here — one flat backlog instead of scattered
 per-feature `PLAN.md` files. Shipped work moves to `.tasks/done.md` instead of staying
-here. Keep aligned with `project_specs.md`'s v1 scope.
+here. The MVP scoped in `project_specs.md` is done — everything here is continuous
+improvement, not walled off by a "v1"/"out of scope" boundary anymore.
 
 **Process**: one item at a time. Implement, get it reviewed/confirmed working in the
 running app, then mark it done here (and move a short summary to `done.md`) before
@@ -54,7 +55,7 @@ Design decisions made during brainstorming:
   without duplicating them into a throwaway local collection first.
 - Each step **live-references** a saved request (from any collection, or
   standalone). Editing the source request updates the flow automatically.
-- Steps run **linearly** (top to bottom) for v1 — deliberately not a DAG or
+- Steps run **linearly** (top to bottom) for now — deliberately not a DAG or
   parallel executor, even though explicit bindings (below) would make one
   derivable later without a data-model change. No branching/conditional/
   loop logic (Postman's `setNextRequest()` makes control flow untraceable
@@ -92,39 +93,22 @@ Design decisions made during brainstorming:
   resources by ID and break on import elsewhere). This is a deliberate
   advantage to preserve, not an incidental detail.
 
-## Response metadata
+## Variable engine polish
 
-- Track and surface response time (ms) and response size (bytes) next to the
-  status badge in `ResponseDetails.tsx` — called for by the Modernist redesign
-  but not yet backed by real data. `HttpResponse` (`src/lib/http.ts`) and the
-  `send_request` command (`src-tauri/src/lib.rs`) currently only return
-  status/headers/body. Needs: time the request in `send_request` (wrap the
-  `request.send().await` call, e.g. `std::time::Instant`) and compute a size
-  (byte length of the response body, plus headers if we want a "wire size"
-  rather than just body size), thread both through `HttpResponse` and
-  `RequestTab`, then render them in the response header row.
+- `{{`-triggered autocomplete of variable names in the Body/URL/Headers
+  editors, via `@codemirror/autocomplete` (already a dependency, currently
+  unused for custom completions).
 
-## Variable engine polish (not in original scope)
-
-- Ctrl/Cmd-click a `{{var}}` token to navigate to its definition.
-- "Create missing variable" quick-fix from an unresolved token.
-- Full diagnostics (squiggly underlines, a problems list) beyond the current
-  resolved/unresolved coloring.
-- Distinct visual treatment for circular vs. plain-unresolved variables (currently
-  both render the same "unresolved" red).
-- `{{`-triggered autocomplete of variable names.
-
-## Scripting polish (not in original scope)
+## Scripting polish
 
 - Postman's own `event`/`exec` script arrays aren't mapped on import/export —
-  an imported Postman collection's scripts are silently dropped.
-- `ctx.variables.*` alias, mutating the URL or HTTP method from a
-  pre-request script — deliberately left out of v1's `ctx` API surface.
-- Snippet helper buttons / autocomplete for the `ctx` API itself (e.g. a
-  quick-insert for `ctx.environment.set(...)`), separate from the JS syntax
-  highlighting above.
+  an imported Postman collection's scripts are silently dropped
+  (`collections.ts` hardcodes both to `""` on import). Scope narrowly first:
+  request-level scripts only, not folder/collection-level inherited scripts
+  (Postman allows scripts at any of those levels) — that inheritance question
+  needs its own decision before extending further.
 
-## Body editor polish (not in original scope)
+## Body editor polish
 
 - "Beautify"/format button for the Body tab — reformat JSON with consistent
   indentation. A naive version (strip `//`/`/* */` comments via
@@ -141,6 +125,7 @@ Design decisions made during brainstorming:
   in comment-preservation if it turns out people actually rely on Body
   comments enough to miss them.
 
-## Explicitly out of scope for v1 (do not build toward these)
+## Not yet prioritized
 
-Per `project_specs.md`: built-in auth helpers (Bearer, Basic, OAuth), request history.
+Ideas noted but nobody's picked up yet — not excluded, just behind everything
+above: built-in auth helpers (Bearer, Basic, OAuth), request history.

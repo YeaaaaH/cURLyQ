@@ -3,6 +3,67 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Variable/scripting polish batch (2026-08-04)
+
+Three small items pulled off the backlog together:
+
+- **Circular vs. unresolved coloring**: `{{var}}` tokens now render in a third
+  amber (`--variable-circular`) color when `resolveVariable` reports a
+  circular reference, distinct from plain-red unresolved — previously both
+  collapsed to red. Fixed in both places token color gets computed:
+  `variableDecorations.ts` (the CodeMirror-based Body editor) and
+  `VariableAwareInput.tsx` (the plain-`<input>` overlay used by the URL bar
+  and Params/Headers values) — the second one was a latent duplicate of the
+  same red/blue-only logic, found while fixing the first.
+- **"Create variable" quick-fix**: the `{{var}}` hover popup's unresolved
+  branch now has a "Create variable" link that adds the token's name to the
+  active environment as a new, empty-value row, reusing
+  `applyEnvironmentPatch`'s existing upsert-by-key logic (normally used for
+  bulk script `ctx.environment.set` results) rather than writing new
+  environment-mutation logic. Threaded as a new `onCreateVariable` prop
+  alongside the existing `onUpdateVariable` through the whole variable-aware
+  chain (`VariableAwareInput`/`VariableAwareTextarea` →
+  `KeyValueEditor`/`RequestVariablesTabs`/`UrlBar`/`RequestEditor` → `App.tsx`).
+  Scoped to the hover popup only, not the "Variables in request" side panel,
+  which doesn't currently receive `environment` and would need extra
+  plumbing for the same guard the popup uses.
+- **`ctx` API snippet buttons**: the Scripts tab editor now shows a row of
+  small insert buttons above the CodeMirror editor (`ScriptEditor.tsx`),
+  scoped per half — `ctx.request.headers.set`/`ctx.request.body.set` only
+  for pre-request, `ctx.response.status`/`ctx.response.json()` only for
+  post-response, `ctx.environment.get`/`set` on both — matching exactly what
+  `sandbox.worker.ts`'s `ctx` object actually exposes per script kind.
+  Inserts at the current cursor position via the CodeMirror view, not just
+  appended to the end.
+
+Also: dropped Ctrl/Cmd-click-to-navigate (marginal value on top of the hover
+popup's existing "Edit environment" link), full lint-style diagnostics —
+squiggly underlines + a problems list — (`@codemirror/lint` isn't a
+dependency yet; the existing inline coloring/hover/side-panel trio already
+surfaces the same info at this app's scale), and `ctx.variables`/URL/method
+mutation from a pre-request script (would make what's actually sent depend
+on running JS first, which `isRequestTabDirty`, the tab's method badge, and
+Collection Run's per-step summary all currently assume is static pre-send) —
+not worth building, so removed from `plan.md` entirely rather than left
+there as dead weight. And retired the "v1 scope" framing project-wide
+(`project_specs.md`,
+`CLAUDE.md`, `README.md`, `.tasks/plan.md`) — the originally-scoped MVP is
+done, so everything from here on is continuous improvement rather than bound
+by a fixed v1/out-of-scope line.
+
+## Response metadata (2026-08-04)
+
+Response time (ms) and size (bytes) now render next to the status badge in
+`ResponseDetails.tsx`, backed by real data instead of the Modernist redesign's mockup
+values. `send_request` (`src-tauri/src/lib.rs`) times the request with
+`std::time::Instant`, measured through body-read completion (not just `.send()`
+returning) so a streamed/chunked response's transfer time is included, not just the time
+to first byte. Size is body byte length only — not a "wire size" including headers —
+since reqwest already decodes the body (and any Content-Encoding) before Rust sees it,
+and `Content-Length` isn't reliable for chunked responses anyway. Both fields added to
+`HttpResponse` (Rust and `src/lib/http.ts`) and threaded through unchanged, since
+`RequestTab.response` already held the whole `HttpResponse` object.
+
 ## Collection run (2026-08-02)
 
 Postman-"Collection Runner"-style batch execution: "Run" on a folder or collection's
