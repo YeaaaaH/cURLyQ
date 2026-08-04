@@ -35,6 +35,7 @@ export function VariableAwareInput({
   environment,
   variableContext,
   onUpdateVariable,
+  onCreateVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
   placeholder,
@@ -49,6 +50,9 @@ export function VariableAwareInput({
   // the full Environment editor — writes straight into the active
   // environment (by variable name), matching Postman's inline-edit UX.
   onUpdateVariable: (name: string, value: string) => void;
+  // Adds an unresolved token's name as a new variable in the active
+  // environment — the hover popup's "Create variable" quick-fix.
+  onCreateVariable: (name: string) => void;
   // Jumps to the full Environment editor for the active environment — only
   // ever called while `environment` is non-null, since there's otherwise
   // nothing to jump to.
@@ -132,7 +136,12 @@ export function VariableAwareInput({
     tokenList.forEach((token, i) => {
       if (token.start > cursor) segments.push(...renderRun(text.slice(cursor, token.start), cursor));
       const resolution = resolveVariable(token.name, variableContext);
-      const tokenColor = resolution.kind === "resolved" ? "var(--color-variable-resolved)" : "var(--color-destructive)";
+      const tokenColor =
+        resolution.kind === "resolved"
+          ? "var(--color-variable-resolved)"
+          : resolution.kind === "circular"
+            ? "var(--color-variable-circular)"
+            : "var(--color-destructive)";
       segments.push(
         <span key={`token-${i}`} ref={(el) => registerTokenSpan(i, el)}>
           {renderRun(text.slice(token.start, token.end), token.start, tokenColor)}
@@ -204,6 +213,7 @@ export function VariableAwareInput({
           environment={environment}
           variableContext={variableContext}
           onUpdateVariable={onUpdateVariable}
+          onCreateVariable={onCreateVariable}
           onOpenEnvironment={onOpenEnvironment}
           onOpenVariablesPanel={onOpenVariablesPanel}
           onMouseEnter={cancelHide}

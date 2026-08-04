@@ -20,6 +20,7 @@ interface UrlBarProps {
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateEnvironmentVariable: (name: string, value: string) => void;
+  onCreateEnvironmentVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -37,6 +38,7 @@ export function UrlBar({
   environment,
   variableContext,
   onUpdateEnvironmentVariable,
+  onCreateEnvironmentVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: UrlBarProps) {
@@ -62,6 +64,7 @@ export function UrlBar({
           environment={environment}
           variableContext={variableContext}
           onUpdateVariable={onUpdateEnvironmentVariable}
+          onCreateVariable={onCreateEnvironmentVariable}
           onOpenEnvironment={onOpenEnvironment}
           onOpenVariablesPanel={onOpenVariablesPanel}
           placeholder="https://example.com"

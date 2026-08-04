@@ -3,8 +3,9 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate
 import { resolveVariable, tokenizeVariables } from "@/lib/variables";
 import { setVariableAwareConfig, variableAwareConfigField } from "@/components/codemirror/variableAwareConfig";
 
-// Colors each {{token}} resolved (blue) or unresolved/circular (red) —
-// same rule VariableAwareTextarea's old manual overlay used. `start`/`end`
+// Colors each {{token}} resolved (blue), circular (amber), or plain
+// unresolved (red) — same three-way split the hover popup and Variables
+// panel already message distinctly. `start`/`end`
 // from tokenizeVariables are already plain string indices, so they drop
 // straight into a decoration range with no translation.
 //
@@ -25,7 +26,12 @@ function buildDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   for (const token of tokenizeVariables(view.state.doc.toString())) {
     const resolution = resolveVariable(token.name, variableContext);
-    const color = resolution.kind === "resolved" ? "var(--color-variable-resolved)" : "var(--color-destructive)";
+    const color =
+      resolution.kind === "resolved"
+        ? "var(--color-variable-resolved)"
+        : resolution.kind === "circular"
+          ? "var(--color-variable-circular)"
+          : "var(--color-destructive)";
     // Both belt (Prec.highest above) and suspenders (!important here): the
     // precedence bump is what actually fixed the nesting-order case, but
     // !important is kept too as a cheap guard against the flat-merged-span

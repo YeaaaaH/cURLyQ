@@ -16,6 +16,7 @@ export interface VariableAwareProps {
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
+  onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -89,6 +90,7 @@ function Row({
           environment={variableAware.environment}
           variableContext={variableAware.variableContext}
           onUpdateVariable={variableAware.onUpdateVariable}
+          onCreateVariable={variableAware.onCreateVariable}
           onOpenEnvironment={variableAware.onOpenEnvironment}
           onOpenVariablesPanel={variableAware.onOpenVariablesPanel}
         />
