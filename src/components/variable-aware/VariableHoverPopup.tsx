@@ -11,6 +11,11 @@ interface VariableHoverPopupContentProps {
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
+  // Adds `name` to the active environment as a new, empty-value variable —
+  // the "unresolved" branch's quick-fix, so a typo'd/never-defined
+  // `{{var}}` can be created on the spot instead of leaving the popup to do
+  // it by hand in the full Environment editor.
+  onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -28,6 +33,7 @@ export function VariableHoverPopupContent({
   environment,
   variableContext,
   onUpdateVariable,
+  onCreateVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: VariableHoverPopupContentProps) {
@@ -46,7 +52,20 @@ export function VariableHoverPopupContent({
       className="flex flex-col gap-1.5 rounded-md bg-popover p-2 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10"
     >
       {resolution.kind === "unresolved" ? (
-        <span className="font-mono text-destructive">{name} is unresolved</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-destructive">{name} is unresolved</span>
+          {environment && (
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              onClick={() => onCreateVariable(name)}
+              className="h-auto shrink-0 p-0"
+            >
+              Create variable
+            </Button>
+          )}
+        </div>
       ) : resolution.kind === "circular" ? (
         <span className="font-mono text-destructive">{resolution.chain.join(" → ")} — circular reference</span>
       ) : isDirectValue ? (
@@ -89,6 +108,7 @@ export function VariableHoverPopup({
   environment,
   variableContext,
   onUpdateVariable,
+  onCreateVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
   onMouseEnter,
@@ -98,6 +118,7 @@ export function VariableHoverPopup({
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
+  onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
   onMouseEnter: () => void;
@@ -115,6 +136,7 @@ export function VariableHoverPopup({
         environment={environment}
         variableContext={variableContext}
         onUpdateVariable={onUpdateVariable}
+        onCreateVariable={onCreateVariable}
         onOpenEnvironment={onOpenEnvironment}
         onOpenVariablesPanel={onOpenVariablesPanel}
       />

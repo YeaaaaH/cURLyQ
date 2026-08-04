@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
-import { formatBody, statusVariant } from "@/lib/requestTabs";
+import { formatBody, formatDuration, formatSize, statusVariant } from "@/lib/requestTabs";
 import type { HttpResponse } from "@/lib/http";
 
 interface ResponseDetailsProps {
@@ -11,9 +11,13 @@ interface ResponseDetailsProps {
 
 export function ResponseDetails({ response }: ResponseDetailsProps) {
   const statusBadge = (
-    <Badge variant={statusVariant(response.status)} className="font-mono text-sm">
-      {response.status}
-    </Badge>
+    <span className="flex items-center gap-2">
+      <Badge variant={statusVariant(response.status)} className="font-mono text-sm">
+        {response.status}
+      </Badge>
+      <span className="font-mono text-xs text-muted-foreground">{formatDuration(response.timeMs)}</span>
+      <span className="font-mono text-xs text-muted-foreground">{formatSize(response.sizeBytes)}</span>
+    </span>
   );
 
   return (

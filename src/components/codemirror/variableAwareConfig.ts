@@ -15,6 +15,7 @@ export interface VariableAwareConfig {
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
+  onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -23,6 +24,7 @@ const noopConfig: VariableAwareConfig = {
   environment: null,
   variableContext: { lookup: () => undefined },
   onUpdateVariable: () => {},
+  onCreateVariable: () => {},
   onOpenEnvironment: () => {},
   onOpenVariablesPanel: () => {},
 };

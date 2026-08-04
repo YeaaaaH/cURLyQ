@@ -30,6 +30,7 @@ interface RequestVariablesTabsProps {
   activeEnvironment: Environment | null;
   variableContext: VariableLookup;
   onUpdateEnvironmentVariable: (name: string, value: string) => void;
+  onCreateEnvironmentVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -45,6 +46,7 @@ export function RequestVariablesTabs({
   activeEnvironment,
   variableContext,
   onUpdateEnvironmentVariable,
+  onCreateEnvironmentVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: RequestVariablesTabsProps) {
@@ -52,6 +54,7 @@ export function RequestVariablesTabs({
     environment: activeEnvironment,
     variableContext,
     onUpdateVariable: onUpdateEnvironmentVariable,
+    onCreateVariable: onCreateEnvironmentVariable,
     onOpenEnvironment,
     onOpenVariablesPanel,
   };
@@ -94,6 +97,7 @@ export function RequestVariablesTabs({
               environment={variableAware.environment}
               variableContext={variableAware.variableContext}
               onUpdateVariable={variableAware.onUpdateVariable}
+              onCreateVariable={variableAware.onCreateVariable}
               onOpenEnvironment={variableAware.onOpenEnvironment}
               onOpenVariablesPanel={variableAware.onOpenVariablesPanel}
             />

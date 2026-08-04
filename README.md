@@ -1,6 +1,6 @@
 # cURLyQ
 
-A desktop HTTP client for sending requests and inspecting responses — a Postman alternative, inspired by it. Built as a learning project for practicing Claude Code, step by step. See [`project_specs.md`](./project_specs.md) for full v1 scope.
+A desktop HTTP client for sending requests and inspecting responses — a Postman alternative, inspired by it. Built as a learning project for practicing Claude Code, step by step. See [`project_specs.md`](./project_specs.md) for the shipped MVP scope.
 
 <p align="center">
   <img src="./docs/screenshots/terminal-theme.png" alt="cURLyQ, terminal theme" width="49%">

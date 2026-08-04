@@ -23,6 +23,7 @@ export function VariableAwareTextarea({
   environment,
   variableContext,
   onUpdateVariable,
+  onCreateVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
   placeholder,
@@ -34,6 +35,7 @@ export function VariableAwareTextarea({
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
+  onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
   placeholder?: string;
@@ -67,11 +69,12 @@ export function VariableAwareTextarea({
         environment,
         variableContext,
         onUpdateVariable,
+        onCreateVariable,
         onOpenEnvironment,
         onOpenVariablesPanel,
       }),
     });
-  }, [environment, variableContext, onUpdateVariable, onOpenEnvironment, onOpenVariablesPanel]);
+  }, [environment, variableContext, onUpdateVariable, onCreateVariable, onOpenEnvironment, onOpenVariablesPanel]);
 
   return (
     <div

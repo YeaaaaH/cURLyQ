@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ScriptHalf } from "@/lib/scripting/types";
 import type { LastScriptRun, ScriptsSubTab } from "@/lib/requestTabs";
-import { ScriptEditor } from "./ScriptEditor";
+import { ScriptEditor, type ScriptSnippet } from "./ScriptEditor";
 import { ScriptLogsPanel } from "./ScriptLogsPanel";
 
 interface ScriptsTabProps {
@@ -22,6 +22,25 @@ const TABS: { id: ScriptsSubTab; label: string }[] = [
 const PLACEHOLDERS: Record<ScriptHalf, string> = {
   "pre-request": `// Runs before the request is sent\nctx.environment.set("timestamp", Date.now().toString());`,
   "post-response": `// Runs after the response arrives\nctx.environment.set("token", ctx.response.json().token);`,
+};
+
+// Quick-insert buttons for the `ctx` API surface each half of the script
+// actually has (see sandbox.worker.ts) — `ctx.request.*` only exists
+// pre-request, `ctx.response.*` only post-response, `ctx.environment.*` is
+// common to both.
+const SNIPPETS: Record<ScriptHalf, ScriptSnippet[]> = {
+  "pre-request": [
+    { label: "environment.get", insert: 'ctx.environment.get("key")' },
+    { label: "environment.set", insert: 'ctx.environment.set("key", "value");' },
+    { label: "request.headers.set", insert: 'ctx.request.headers.set("Header-Name", "value");' },
+    { label: "request.body.set", insert: "ctx.request.body.set(JSON.stringify(payload));" },
+  ],
+  "post-response": [
+    { label: "environment.get", insert: 'ctx.environment.get("key")' },
+    { label: "environment.set", insert: 'ctx.environment.set("key", "value");' },
+    { label: "response.status", insert: "ctx.response.status" },
+    { label: "response.json()", insert: "ctx.response.json()" },
+  ],
 };
 
 export function ScriptsTab({
@@ -63,6 +82,7 @@ export function ScriptsTab({
           value={activeScriptTab === "pre-request" ? preRequestScript : postResponseScript}
           onChange={(value) => onChangeScript(activeScriptTab, value)}
           placeholder={PLACEHOLDERS[activeScriptTab]}
+          snippets={SNIPPETS[activeScriptTab]}
         />
       )}
     </div>

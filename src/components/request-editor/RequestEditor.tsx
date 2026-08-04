@@ -24,6 +24,7 @@ interface RequestEditorProps {
   activeEnvironment: Environment | null;
   variableContext: VariableLookup;
   onUpdateEnvironmentVariable: (name: string, value: string) => void;
+  onCreateEnvironmentVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
@@ -45,6 +46,7 @@ export function RequestEditor({
   activeEnvironment,
   variableContext,
   onUpdateEnvironmentVariable,
+  onCreateEnvironmentVariable,
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: RequestEditorProps) {
@@ -110,6 +112,7 @@ export function RequestEditor({
         environment={activeEnvironment}
         variableContext={variableContext}
         onUpdateEnvironmentVariable={onUpdateEnvironmentVariable}
+        onCreateEnvironmentVariable={onCreateEnvironmentVariable}
         onOpenEnvironment={onOpenEnvironment}
         onOpenVariablesPanel={onOpenVariablesPanel}
       />

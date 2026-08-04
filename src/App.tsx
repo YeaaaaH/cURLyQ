@@ -183,6 +183,12 @@ function App() {
   function handleOpenEnvironment() {
     if (environments.activeEnvironmentId) environments.openEnvironmentEditor(environments.activeEnvironmentId);
   }
+  // The hover popup's "Create variable" quick-fix on an unresolved token —
+  // reuses applyEnvironmentPatch's upsert-by-key logic (normally for bulk
+  // script ctx.environment.set results) for a single new, empty-value entry.
+  function handleCreateEnvironmentVariable(name: string) {
+    environments.applyEnvironmentPatch({ [name]: "" });
+  }
   function handleOpenVariablesPanel() {
     variablesPanel.setOpen(true);
   }
@@ -277,6 +283,7 @@ function App() {
                   activeEnvironment={environments.activeEnvironment}
                   variableContext={environments.variableContext}
                   onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+                  onCreateEnvironmentVariable={handleCreateEnvironmentVariable}
                   onOpenEnvironment={handleOpenEnvironment}
                   onOpenVariablesPanel={handleOpenVariablesPanel}
                 />
@@ -295,6 +302,7 @@ function App() {
                   activeEnvironment={environments.activeEnvironment}
                   variableContext={environments.variableContext}
                   onUpdateEnvironmentVariable={environments.updateActiveEnvironmentVariable}
+                  onCreateEnvironmentVariable={handleCreateEnvironmentVariable}
                   onOpenEnvironment={handleOpenEnvironment}
                   onOpenVariablesPanel={handleOpenVariablesPanel}
                 />
