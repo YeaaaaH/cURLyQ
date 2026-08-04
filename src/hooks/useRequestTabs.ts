@@ -8,7 +8,6 @@ import { buildCurlCommand } from "@/lib/curl";
 import { parseParamsFromUrl, syncUrlWithParams } from "@/lib/requestUrl";
 import type { Environment } from "@/lib/environments";
 import { environmentToRecord, sendRequestWithScripts } from "@/lib/requestSend";
-import { toggleLineComment } from "@/lib/textEditing";
 import {
   type PersistedTabsFile,
   type RequestTab,
@@ -327,26 +326,6 @@ export function useRequestTabs({
     [activeId]
   );
 
-  function handleBodyKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "/" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      const textarea = e.currentTarget;
-      const next = toggleLineComment(textarea.value, textarea.selectionStart, textarea.selectionEnd);
-      updateActiveRequest({ body: next.value });
-      requestAnimationFrame(() => textarea.setSelectionRange(next.selectionStart, next.selectionEnd));
-      return;
-    }
-    if (e.key !== "Tab") return;
-    e.preventDefault();
-    const textarea = e.currentTarget;
-    const { selectionStart, selectionEnd, value } = textarea;
-    const cursor = selectionStart + 2;
-    updateActiveRequest({ body: value.slice(0, selectionStart) + "  " + value.slice(selectionEnd) });
-    // Controlled textareas don't preserve cursor position on programmatic value
-    // changes, so restore it manually once React commits the new value.
-    requestAnimationFrame(() => textarea.setSelectionRange(cursor, cursor));
-  }
-
   function handleUrlChange(rawUrl: string) {
     if (rawUrl.trim() === "") {
       updateActiveRequest({
@@ -461,7 +440,6 @@ export function useRequestTabs({
     removeParam,
     updateHeader,
     removeHeader,
-    handleBodyKeyDown,
     handleUrlChange,
     handleSend,
     isUrlEmpty,

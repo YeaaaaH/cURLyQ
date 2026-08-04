@@ -26,7 +26,6 @@ interface RequestVariablesTabsProps {
   removeParam: (index: number) => void;
   updateHeader: (index: number, patch: Partial<KeyValuePair>) => void;
   removeHeader: (index: number) => void;
-  onBodyKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   bodyError: string | null;
   activeEnvironment: Environment | null;
   variableContext: VariableLookup;
@@ -42,7 +41,6 @@ export function RequestVariablesTabs({
   removeParam,
   updateHeader,
   removeHeader,
-  onBodyKeyDown,
   bodyError,
   activeEnvironment,
   variableContext,
@@ -92,7 +90,6 @@ export function RequestVariablesTabs({
               placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
               value={activeRequest.body}
               onChange={(value) => onUpdate({ body: value })}
-              onKeyDown={onBodyKeyDown}
               ariaInvalid={bodyError !== null}
               environment={variableAware.environment}
               variableContext={variableAware.variableContext}
