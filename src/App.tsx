@@ -291,7 +291,6 @@ function App() {
                   removeParam={tabs.removeParam}
                   updateHeader={tabs.updateHeader}
                   removeHeader={tabs.removeHeader}
-                  onBodyKeyDown={tabs.handleBodyKeyDown}
                   bodyError={tabs.bodyError}
                   activeEnvironment={environments.activeEnvironment}
                   variableContext={environments.variableContext}

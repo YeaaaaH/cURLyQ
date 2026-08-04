@@ -46,6 +46,32 @@ resetting saved scripts to `""` (the JSON keys never matched), and every `load_c
 left `preRequestScript`/`postResponseScript` `undefined` in JS. No data was actually lost
 by the fix, since nothing had ever round-tripped correctly in the first place.
 
+## Body + Script editors — CodeMirror 6 (2026-08-04)
+
+Replaced the plain `<textarea>`-based Script editor (`ScriptEditor.tsx`) and
+the hand-rolled overlay-on-textarea Body editor (`VariableAwareTextarea.tsx`)
+with CodeMirror 6, wired up by hand (`src/components/codemirror/`:
+`useCodeMirrorEditor` mount/sync hook, shared `theme.ts`/`baseExtensions`)
+rather than a wrapper library — real JS/JSON syntax highlighting, bracket
+matching/auto-close, and native undo history and selection rendering for
+both. Body's `{{var}}` resolved/unresolved coloring and hover-to-edit popup
+were ported from the old overlay to a CodeMirror `ViewPlugin` (decorations)
++ `hoverTooltip` extension (`variableDecorations.ts`/
+`variableHoverTooltip.tsx`); `VariableHoverPopup.tsx` split into a shared
+`VariableHoverPopupContent` plus a thin rect-positioned wrapper still used
+by the untouched single-line `VariableAwareInput` (Params/Headers/URL).
+Non-obvious: a variable token almost always sits inside a JSON string,
+which the JS syntax highlighter also colors — CodeMirror nested our
+decoration as the *outer* span around the highlighter's, so `!important`
+alone couldn't win (a descendant's own color always beats an ancestor's,
+`!important` or not); fixed by wrapping the decoration plugin in
+`Prec.highest(...)` to win CodeMirror's own decoration-precedence order.
+Also fixed a latent `getBodyError` bug found along the way: a body that's
+entirely commented out failed to parse ("Body is not valid JSON") because
+the empty-body check ran before comment-stripping. `src/lib/textEditing.ts`
+(the old hand-rolled Ctrl+/ toggle) deleted, superseded by CodeMirror's
+built-in `toggleComment`.
+
 ## CI/CD — cross-platform release builds (2026-08-01)
 
 Two workflows: `.github/workflows/ci.yml` (PRs + pushes to `master` — frontend

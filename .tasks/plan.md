@@ -116,12 +116,6 @@ Design decisions made during brainstorming:
 
 ## Scripting polish (not in original scope)
 
-- More advanced text editing for the script editor — currently a plain
-  `<textarea>` (`ScriptEditor.tsx`) with only `Ctrl+/` comment-toggle; no JS
-  syntax highlighting, bracket matching, or autocomplete. Likely needs a
-  real editor component (e.g. CodeMirror) rather than extending the plain
-  textarea further — worth designing deliberately rather than bolting on
-  piecemeal.
 - Postman's own `event`/`exec` script arrays aren't mapped on import/export —
   an imported Postman collection's scripts are silently dropped.
 - `ctx.variables.*` alias, mutating the URL or HTTP method from a
@@ -129,6 +123,23 @@ Design decisions made during brainstorming:
 - Snippet helper buttons / autocomplete for the `ctx` API itself (e.g. a
   quick-insert for `ctx.environment.set(...)`), separate from the JS syntax
   highlighting above.
+
+## Body editor polish (not in original scope)
+
+- "Beautify"/format button for the Body tab — reformat JSON with consistent
+  indentation. A naive version (strip `//`/`/* */` comments via
+  `stripJsonComments`, substitute `{{vars}}` with placeholders the same way
+  `getBodyError` does, `JSON.parse` + `JSON.stringify(..., null, 2)`) is
+  small, comparable effort to Sidebar search's basic filtering — but it
+  silently destroys any comments in the body, which stings now that
+  comment-tolerance is a real, deliberate feature (see the CodeMirror
+  editor swap in `done.md`). Preserving comments through a reformat needs a
+  real parser that attaches comments to AST nodes and re-emits them in
+  place — the hard part of any formatter — likely via a dependency (e.g.
+  Prettier's standalone bundle) rather than a hand-rolled reformatter.
+  Recommendation: ship the naive strip-comments version first, only invest
+  in comment-preservation if it turns out people actually rely on Body
+  comments enough to miss them.
 
 ## Explicitly out of scope for v1 (do not build toward these)
 

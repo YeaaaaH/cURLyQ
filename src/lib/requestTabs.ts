@@ -246,7 +246,12 @@ export function stripJsonComments(text: string): string {
 }
 
 export function getBodyError(body: string, context: VariableLookup): string | null {
-  if (body.trim() === "") return null;
+  const withoutComments = stripJsonComments(body);
+  // Checked after stripping comments (not on the raw `body`) so a body
+  // that's entirely commented out — e.g. a whole example JSON block toggled
+  // off with Ctrl+/ — counts as empty too, instead of failing to parse the
+  // leftover blank string.
+  if (withoutComments.trim() === "") return null;
   // Resolve whatever the current context can (so e.g. {{port}} used
   // unquoted for a numeric value validates correctly once it substitutes to
   // real digits), then treat anything still unresolved — no active
@@ -254,10 +259,7 @@ export function getBodyError(body: string, context: VariableLookup): string | nu
   // placeholder for validation purposes only. Postman itself doesn't block
   // editing/sending over a {{var}} that hasn't resolved yet; it'll either
   // resolve by send time or the server will complain, not the editor.
-  const withPlaceholders = substituteVariables(stripJsonComments(body), context).replace(
-    VARIABLE_PATTERN,
-    "null"
-  );
+  const withPlaceholders = substituteVariables(withoutComments, context).replace(VARIABLE_PATTERN, "null");
   try {
     JSON.parse(withPlaceholders);
     return null;
