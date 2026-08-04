@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HttpResponse {
     status: u16,
     // A tuple vec (not HashMap<String, String>) so repeated header names —
@@ -10,6 +11,11 @@ struct HttpResponse {
     // silently overwriting the earlier ones.
     headers: Vec<(String, String)>,
     body: String,
+    time_ms: u128,
+    // Body size only (not a "wire size" including headers/status line) —
+    // matches what `body` actually holds, since reqwest already decodes any
+    // Content-Encoding before we see it.
+    size_bytes: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -132,6 +138,7 @@ async fn send_request(
     // (e.g. "Connection refused (os error 10061)" on Windows vs. "(os error
     // 111)" on Linux). The technical detail stays appended for debugging —
     // just with a plain-language headline in front of it.
+    let start = std::time::Instant::now();
     let response = request.send().await.map_err(|e| {
         if e.is_connect() {
             format!("Couldn't connect to the server — it may not be running, or the address/port may be wrong.\n\n{e}")
@@ -154,11 +161,19 @@ async fn send_request(
         })
         .collect::<Vec<_>>();
     let body = response.text().await.map_err(|e| e.to_string())?;
+    // Measured through body-read completion, not just the initial response —
+    // for a streamed/chunked body, `.send()` alone returns once headers
+    // arrive, well before the transfer (and the time a user actually waits)
+    // is done.
+    let time_ms = start.elapsed().as_millis();
+    let size_bytes = body.len();
 
     Ok(HttpResponse {
         status,
         headers,
         body,
+        time_ms,
+        size_bytes,
     })
 }
 

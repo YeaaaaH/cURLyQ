@@ -166,6 +166,17 @@ export function statusVariant(status: number): "success" | "secondary" | "destru
   return "destructive";
 }
 
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function getUrlError(url: string, context: VariableLookup): string | null {
   const trimmed = url.trim();
   if (trimmed === "") return null;

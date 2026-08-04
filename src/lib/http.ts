@@ -28,4 +28,6 @@ export interface HttpResponse {
   // silently overwriting the earlier ones.
   headers: [string, string][];
   body: string;
+  timeMs: number;
+  sizeBytes: number;
 }
