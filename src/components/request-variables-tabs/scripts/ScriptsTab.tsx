@@ -20,8 +20,8 @@ const TABS: { id: ScriptsSubTab; label: string }[] = [
 ];
 
 const PLACEHOLDERS: Record<ScriptHalf, string> = {
-  "pre-request": `// Runs before the request is sent\nctx.environment.set("timestamp", Date.now().toString());`,
-  "post-response": `// Runs after the response arrives\nctx.environment.set("token", ctx.response.json().token);`,
+  "pre-request": `ctx.environment.set("timestamp", Date.now().toString());`,
+  "post-response": `ctx.environment.set("token", ctx.response.json().token);`,
 };
 
 // Quick-insert buttons for the `ctx` API surface each half of the script
