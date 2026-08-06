@@ -128,6 +128,7 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.65 0.12 240);
+    --ring-glow: oklch(0.65 0.12 240 / 35%);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -148,8 +149,8 @@
     --foreground: #c9d6cb;
     --card: #0a0d0a;
     --card-foreground: #c9d6cb;
-    --popover: #0a0d0a;
-    --popover-foreground: #c9d6cb;
+    --popover: #141c17;
+    --popover-foreground: #eafff0;
     --primary: #4ade80;
     --primary-foreground: #06120a;
     --secondary: #141c17;
