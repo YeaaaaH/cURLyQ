@@ -27,7 +27,7 @@ function RequestTabItem({ tab, active, dirty, onSelect, onClose, ref }: RequestT
         if (e.key === "Enter" || e.key === " ") onSelect();
       }}
       className={cn(
-        "flex shrink-0 cursor-default items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+        "flex shrink-0 cursor-default items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring-glow",
         active
           ? "border border-border bg-card"
           : "border border-transparent bg-transparent text-muted-foreground hover:text-foreground"
@@ -38,7 +38,9 @@ function RequestTabItem({ tab, active, dirty, onSelect, onClose, ref }: RequestT
       ) : (
         <ListChecks className="size-3.5 shrink-0 text-muted-foreground" />
       )}
-      <span className={active ? "text-foreground" : undefined}>{name}</span>
+      <span className={cn("min-w-0 max-w-[120px] truncate", active && "text-foreground")} title={name}>
+        {name}
+      </span>
       {dirty && (
         <span
           className="size-1.5 shrink-0 rounded-full bg-muted-foreground/70"
@@ -54,9 +56,9 @@ function RequestTabItem({ tab, active, dirty, onSelect, onClose, ref }: RequestT
           onClose();
         }}
         aria-label={`Close ${name}`}
-        className="rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+        className="rounded p-1 text-muted-foreground/70 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring-glow"
       >
-        <X className="size-3" />
+        <X className="size-3.5" />
       </button>
     </div>
   );

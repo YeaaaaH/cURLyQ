@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Braces } from "lucide-react";
+import { Braces, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HTTP_METHODS, METHOD_COLORS } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
@@ -81,6 +81,7 @@ export function UrlBar({
           <Braces className="size-4" />
         </Button>
         <Button type="submit" className="w-24" disabled={isSending || !canSend}>
+          {isSending && <Loader2 className="size-3.5 animate-spin" />}
           {isSending ? "Sending…" : "Send"}
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Folder } from "lucide-react";
+import { ChevronDown, Folder, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HighlightMatch } from "@/components/HighlightMatch";
 import { METHOD_COLORS } from "@/lib/http";
@@ -40,8 +40,10 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
     isOpen,
     setOpen,
     isDragActive,
+    runningId,
   } = handlers;
   const isRenaming = renamingId === node.id;
+  const isRunning = runningId === node.id;
   const dnd = useTreeDragAndDrop(node.id, isRenaming);
 
   function addRequestToFolder() {
@@ -73,15 +75,20 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
           )}
           style={{ paddingLeft: depth * TREE_INDENT_PX }}
         >
-          <CollapsibleTrigger
-            disabled={isRenaming}
-            className="group flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:text-foreground"
-          >
-            <span className="flex w-8 shrink-0 items-center gap-0.5">
-              <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
-              <Folder className="size-3.5 shrink-0" />
-            </span>
-            {isRenaming ? (
+          {isRenaming ? (
+            // Not a CollapsibleTrigger (i.e. not a <button>) while renaming —
+            // an <input> nested inside a <button> is invalid HTML, and in
+            // practice the button swallows focus/clicks so the input can
+            // never actually be typed into.
+            <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground">
+              <span className="flex w-8 shrink-0 items-center gap-0.5">
+                <ChevronDown className="size-3 shrink-0" />
+                {isRunning ? (
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                ) : (
+                  <Folder className="size-3.5 shrink-0" />
+                )}
+              </span>
               <RenameInput
                 name={node.name}
                 onCommit={(name) => {
@@ -90,12 +97,22 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
                 }}
                 onCancel={onCancelRename}
               />
-            ) : (
-              <span className="min-w-0 flex-1 truncate">
+            </div>
+          ) : (
+            <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring-glow">
+              <span className="flex w-8 shrink-0 items-center gap-0.5">
+                <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
+                {isRunning ? (
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                ) : (
+                  <Folder className="size-3.5 shrink-0" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate" title={node.name}>
                 <HighlightMatch text={node.name} query={handlers.query} />
               </span>
-            )}
-          </CollapsibleTrigger>
+            </CollapsibleTrigger>
+          )}
           <QuickAddRequestButton onClick={addRequestToFolder} />
           <NodeMenu
             onNewFolder={addFolderToFolder}
@@ -103,6 +120,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
             onRun={() => onRunNode(collectionId, node)}
             onRename={() => onStartRename(node.id)}
             onDelete={() => requestDeleteNode(collectionId, node)}
+            isRunning={isRunning}
           />
         </div>
         <CollapsibleContent className="flex flex-col gap-0.5 overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
@@ -151,21 +169,18 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
       )}
       style={{ paddingLeft: depth * TREE_INDENT_PX }}
     >
-      <button
-        type="button"
-        disabled={isRenaming}
-        onClick={() => onOpenRequest(collectionId, node)}
-        className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:text-foreground"
-      >
-        <span
-          className={cn(
-            "w-8 shrink-0 overflow-hidden text-center text-[9px] font-semibold tracking-tighter",
-            METHOD_COLORS[node.method]
-          )}
-        >
-          {node.method}
-        </span>
-        {isRenaming ? (
+      {isRenaming ? (
+        // Not a <button> while renaming — see the matching comment in
+        // FolderRow for why an <input> can't live inside one.
+        <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground">
+          <span
+            className={cn(
+              "w-8 shrink-0 overflow-hidden text-center text-[9px] font-semibold tracking-tighter",
+              METHOD_COLORS[node.method]
+            )}
+          >
+            {node.method}
+          </span>
           <RenameInput
             name={node.name}
             onCommit={(name) => {
@@ -174,12 +189,26 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
             }}
             onCancel={onCancelRename}
           />
-        ) : (
-          <span className="min-w-0 flex-1 truncate">
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenRequest(collectionId, node)}
+          className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring-glow"
+        >
+          <span
+            className={cn(
+              "w-8 shrink-0 overflow-hidden text-center text-[9px] font-semibold tracking-tighter",
+              METHOD_COLORS[node.method]
+            )}
+          >
+            {node.method}
+          </span>
+          <span className="min-w-0 flex-1 truncate" title={node.name}>
             <HighlightMatch text={node.name} query={handlers.query} />
           </span>
-        )}
-      </button>
+        </button>
+      )}
       <NodeMenu onRename={() => onStartRename(node.id)} onDelete={() => requestDeleteNode(collectionId, node)} />
     </div>
   );
@@ -199,6 +228,7 @@ export interface CollectionRowProps {
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
   handlers: TreeHandlers;
+  runningId: string | null;
 }
 
 export function CollectionRow({
@@ -215,7 +245,9 @@ export function CollectionRow({
   onAddFolder,
   onAddRequest,
   handlers,
+  runningId,
 }: CollectionRowProps) {
+  const isRunning = runningId === collection.id;
   // Collections cannot be dragged but remain valid drop targets for content
   // dropped onto their root.
   const dnd = useTreeDragAndDrop(collection.id, isRenaming, false);
@@ -240,15 +272,18 @@ export function CollectionRow({
         {...dnd.listeners}
         className={cn("group/node flex shrink-0 items-center rounded-md", dnd.isOver && "bg-accent")}
       >
-        <CollapsibleTrigger
-          disabled={isRenaming}
-          className="group flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <span className="flex w-8 shrink-0 items-center gap-0.5">
-            <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
-            <Folder className="size-3.5 shrink-0" />
-          </span>
-          {isRenaming ? (
+        {isRenaming ? (
+          // Not a CollapsibleTrigger (i.e. not a <button>) while renaming —
+          // see the matching comment in FolderRow for why.
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground">
+            <span className="flex w-8 shrink-0 items-center gap-0.5">
+              <ChevronDown className="size-3 shrink-0" />
+              {isRunning ? (
+                <Loader2 className="size-3.5 shrink-0 animate-spin" />
+              ) : (
+                <Folder className="size-3.5 shrink-0" />
+              )}
+            </span>
             <RenameInput
               name={collection.name}
               onCommit={(name) => {
@@ -257,12 +292,22 @@ export function CollectionRow({
               }}
               onCancel={onCancelRename}
             />
-          ) : (
-            <span className="min-w-0 flex-1 truncate">
+          </div>
+        ) : (
+          <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring-glow">
+            <span className="flex w-8 shrink-0 items-center gap-0.5">
+              <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
+              {isRunning ? (
+                <Loader2 className="size-3.5 shrink-0 animate-spin" />
+              ) : (
+                <Folder className="size-3.5 shrink-0" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 truncate" title={collection.name}>
               <HighlightMatch text={collection.name} query={handlers.query} />
             </span>
-          )}
-        </CollapsibleTrigger>
+          </CollapsibleTrigger>
+        )}
         <QuickAddRequestButton onClick={addRootRequest} />
         <NodeMenu
           onNewFolder={addRootFolder}
@@ -271,6 +316,7 @@ export function CollectionRow({
           onRename={() => onStartRename(collection.id)}
           onExport={() => onExportCollection(collection.id)}
           onDelete={onRequestDeleteCollection}
+          isRunning={isRunning}
         />
       </div>
       <CollapsibleContent className="flex flex-col gap-0.5 overflow-hidden pl-3 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">

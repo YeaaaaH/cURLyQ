@@ -90,7 +90,7 @@ export function RequestVariablesTabs({
           <div className="flex h-full min-h-0 flex-col gap-1.5">
             <VariableAwareTextarea
               className="font-mono text-sm"
-              placeholder={`{\n  "name": "Ada Lovelace",\n  "role": "engineer",\n  "tags": ["math", "computing"]\n}`}
+              placeholder={`{ "name": "Ada Lovelace", "role": "engineer" }`}
               value={activeRequest.body}
               onChange={(value) => onUpdate({ body: value })}
               ariaInvalid={bodyError !== null}

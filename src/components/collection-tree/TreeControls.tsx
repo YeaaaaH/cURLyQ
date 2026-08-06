@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Folder, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { Download, Folder, Loader2, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import type { PendingDelete } from "./types";
 
 interface RenameInputProps {
@@ -39,7 +39,8 @@ export function RenameInput({ name, onCommit, onCancel }: RenameInputProps) {
 
   useEffect(() => {
     setDraft(name);
-    inputRef.current?.select();
+    inputRef.current?.focus();
+    inputRef.current?.setSelectionRange(name.length, name.length);
   }, [name]);
 
   function commit() {
@@ -113,9 +114,27 @@ interface NodeMenuProps {
   onRename: () => void;
   onExport?: () => void;
   onDelete: () => void;
+  isRunning?: boolean;
 }
 
-export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport, onDelete }: NodeMenuProps) {
+export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport, onDelete, isRunning }: NodeMenuProps) {
+  // Rename (and "new folder"/"new request", which also starts a rename)
+  // mount a text input the instant an item is clicked — but Radix's
+  // dropdown keeps a trapped focus scope alive for the ~100ms close
+  // animation, and that scope snaps focus straight back to itself the
+  // moment it notices focus land outside it, undoing the input's own
+  // focus a beat after it was set. Radix's own fix for this is to defer
+  // the action to `onCloseAutoFocus`, which fires only once that scope has
+  // fully torn down — so instead of running the action immediately, stash
+  // it and let the menu itself decide when it's safe.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  function deferUntilClosed(action: () => void) {
+    return () => {
+      pendingActionRef.current = action;
+    };
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -130,36 +149,44 @@ export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport,
           <MoreHorizontal className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenuContent
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          pendingActionRef.current?.();
+          pendingActionRef.current = null;
+        }}
+      >
         {onNewFolder && (
-          <DropdownMenuItem onClick={onNewFolder}>
+          <DropdownMenuItem onClick={deferUntilClosed(onNewFolder)}>
             <Folder className="size-3.5" />
             New folder
           </DropdownMenuItem>
         )}
         {onNewRequest && (
-          <DropdownMenuItem onClick={onNewRequest}>
+          <DropdownMenuItem onClick={deferUntilClosed(onNewRequest)}>
             <Plus className="size-3.5" />
             New request
           </DropdownMenuItem>
         )}
         {onRun && (
-          <DropdownMenuItem onClick={onRun}>
-            <Play className="size-3.5" />
-            Run
+          <DropdownMenuItem onClick={deferUntilClosed(onRun)} disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+            {isRunning ? "Running…" : "Run"}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={onRename}>
+        <DropdownMenuItem onClick={deferUntilClosed(onRename)}>
           <Pencil className="size-3.5" />
           Rename
         </DropdownMenuItem>
         {onExport && (
-          <DropdownMenuItem onClick={onExport}>
+          <DropdownMenuItem onClick={deferUntilClosed(onExport)}>
             <Download className="size-3.5" />
             Export...
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem variant="destructive" onClick={onDelete}>
+        <DropdownMenuItem variant="destructive" onClick={deferUntilClosed(onDelete)}>
           <Trash2 className="size-3.5" />
           Delete
         </DropdownMenuItem>

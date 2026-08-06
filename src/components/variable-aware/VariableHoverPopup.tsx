@@ -126,7 +126,7 @@ export function VariableHoverPopup({
 }) {
   return createPortal(
     <div
-      className="fixed z-50"
+      className="fixed z-50 animate-in fade-in-0 zoom-in-95 duration-100"
       style={{ top: hover.rect.bottom + 4, left: hover.rect.left }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
