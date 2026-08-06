@@ -1,9 +1,9 @@
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PanelLeftClose } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Environment } from "@/lib/environments";
-import type { Collection, CollectionNode, RequestNode } from "@/lib/collections";
+import { type Environment, filterEnvironments } from "@/lib/environments";
+import { type Collection, type CollectionNode, type RequestNode, filterCollections } from "@/lib/collections";
 import type { ImportExportLogEntry } from "@/lib/importExportLog";
 import { SidebarSearchAndAdd } from "./SidebarSearchAndAdd";
 import { CollectionsSection } from "./CollectionsSection";
@@ -64,6 +64,18 @@ export const Sidebar = memo(function Sidebar({
   collectionsProps,
   environmentsProps,
 }: SidebarProps) {
+  // Plain useState, not persisted — search text shouldn't survive a reload.
+  const [query, setQuery] = useState("");
+
+  const filteredCollections = useMemo(
+    () => filterCollections(collectionsProps.collections, query),
+    [collectionsProps.collections, query]
+  );
+  const filteredEnvironments = useMemo(
+    () => filterEnvironments(environmentsProps.environments, query),
+    [environmentsProps.environments, query]
+  );
+
   function handleEdgeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -103,6 +115,8 @@ export const Sidebar = memo(function Sidebar({
           </div>
 
           <SidebarSearchAndAdd
+            query={query}
+            onQueryChange={setQuery}
             onAddCollection={collectionsProps.onAddCollection}
             onAddEnvironment={environmentsProps.onAddEnvironment}
             onImportEnvironment={environmentsProps.onImportEnvironment}
@@ -110,7 +124,8 @@ export const Sidebar = memo(function Sidebar({
           />
 
           <CollectionsSection
-            collections={collectionsProps.collections}
+            collections={filteredCollections}
+            query={query}
             onRenameCollection={collectionsProps.onRenameCollection}
             onDeleteCollection={collectionsProps.onDeleteCollection}
             onRunCollection={collectionsProps.onRunCollection}
@@ -125,7 +140,8 @@ export const Sidebar = memo(function Sidebar({
           />
 
           <EnvironmentsSection
-            environments={environmentsProps.environments}
+            environments={filteredEnvironments}
+            query={query}
             activeEnvironmentId={environmentsProps.activeEnvironmentId}
             onSelectEnvironment={environmentsProps.onSelectEnvironment}
             onEditEnvironment={environmentsProps.onEditEnvironment}

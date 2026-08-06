@@ -4,10 +4,13 @@ import { ChevronDown, Download, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Environment } from "@/lib/environments";
 import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
+import { useSearchForcedOpen } from "@/hooks/useSearchForcedOpen";
+import { HighlightMatch } from "@/components/HighlightMatch";
 import { CAPPED_LIST_MAX_HEIGHT_PX, ENVIRONMENTS_SECTION_OPEN_KEY } from "./constants";
 
 interface EnvironmentRowProps {
   environment: Environment;
+  query: string;
   active: boolean;
   onSelect: () => void;
   onExport: () => void;
@@ -15,7 +18,7 @@ interface EnvironmentRowProps {
   onDelete: () => void;
 }
 
-function EnvironmentRow({ environment, active, onSelect, onExport, onEdit, onDelete }: EnvironmentRowProps) {
+function EnvironmentRow({ environment, query, active, onSelect, onExport, onEdit, onDelete }: EnvironmentRowProps) {
   return (
     <div className={cn("group/sidebar-env flex shrink-0 items-center rounded-md", active && "bg-secondary")}>
       <button
@@ -27,7 +30,9 @@ function EnvironmentRow({ environment, active, onSelect, onExport, onEdit, onDel
         )}
       >
         <span className={cn("size-1.5 shrink-0 rounded-full", active ? "bg-success" : "bg-border")} aria-hidden />
-        <span className="min-w-0 flex-1 truncate">{environment.name}</span>
+        <span className="min-w-0 flex-1 truncate">
+          <HighlightMatch text={environment.name} query={query} />
+        </span>
       </button>
       <Button
         type="button"
@@ -65,6 +70,7 @@ function EnvironmentRow({ environment, active, onSelect, onExport, onEdit, onDel
 
 interface EnvironmentsSectionProps {
   environments: readonly Environment[];
+  query: string;
   activeEnvironmentId: string | null;
   onSelectEnvironment: (id: string) => void;
   onEditEnvironment: (id: string) => void;
@@ -74,16 +80,18 @@ interface EnvironmentsSectionProps {
 
 export function EnvironmentsSection({
   environments,
+  query,
   activeEnvironmentId,
   onSelectEnvironment,
   onEditEnvironment,
   onExportEnvironment,
   onDeleteEnvironment,
 }: EnvironmentsSectionProps) {
-  const [isOpen, setIsOpen] = usePersistedBoolean(ENVIRONMENTS_SECTION_OPEN_KEY, true);
+  const [persistedOpen, setPersistedOpen] = usePersistedBoolean(ENVIRONMENTS_SECTION_OPEN_KEY, true);
+  const [isOpen, setOpen] = useSearchForcedOpen(query, persistedOpen, setPersistedOpen);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex shrink-0 flex-col">
+    <Collapsible open={isOpen} onOpenChange={setOpen} className="flex shrink-0 flex-col">
       <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
         Environments
@@ -97,6 +105,7 @@ export function EnvironmentsSection({
             <EnvironmentRow
               key={environment.id}
               environment={environment}
+              query={query}
               active={environment.id === activeEnvironmentId}
               onSelect={() => onSelectEnvironment(environment.id)}
               onExport={() => onExportEnvironment(environment.id)}

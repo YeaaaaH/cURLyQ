@@ -10,6 +10,8 @@ import { FolderPlus, Globe, Plus, Search, Upload } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 interface SidebarSearchAndAddProps {
+  query: string;
+  onQueryChange: (query: string) => void;
   onAddCollection: () => void;
   onAddEnvironment: () => void;
   onImportEnvironment: () => void;
@@ -17,6 +19,8 @@ interface SidebarSearchAndAddProps {
 }
 
 export function SidebarSearchAndAdd({
+  query,
+  onQueryChange,
   onAddCollection,
   onAddEnvironment,
   onImportEnvironment,
@@ -42,9 +46,12 @@ export function SidebarSearchAndAdd({
         ) : (
           <Search className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         )}
-        {/* Not wired up yet — filtering collections/environments as you
-            type is a follow-up, this is just the search bar's shell. */}
-        <Input placeholder={isTerminal ? "grep" : "Search..."} className="h-8 pl-7" />
+        <Input
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={isTerminal ? "grep" : "Search..."}
+          className="h-8 pl-7"
+        />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

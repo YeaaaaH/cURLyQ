@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -9,7 +9,15 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { collectAllNodeIds, countNodes, locateNode, type Collection, type CollectionNode, type RequestNode } from "@/lib/collections";
+import {
+  collectAllNodeIds,
+  collectContainerIds,
+  countNodes,
+  locateNode,
+  type Collection,
+  type CollectionNode,
+  type RequestNode,
+} from "@/lib/collections";
 import { CollectionRow } from "./TreeRows";
 import { resolveDragPreview, TreeDragOverlay } from "./TreeDragAndDrop";
 import { DeleteConfirmationDialog } from "./TreeControls";
@@ -17,6 +25,10 @@ import { useCollectionTreeState } from "./useCollectionTreeState";
 import type { PendingDelete, TreeHandlers } from "./types";
 
 const DRAG_EXPAND_DWELL_MS = 600;
+
+// Stable empty set so a blank query doesn't allocate (or force any renders
+// off) a new reveal set every render.
+const NO_REVEAL_IDS: ReadonlySet<string> = new Set();
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -35,6 +47,7 @@ function describeCounts(counts: { folders: number; requests: number }): string {
 
 interface CollectionTreeProps {
   collections: readonly Collection[];
+  query: string;
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
   onRunCollection: (id: string) => void;
@@ -50,6 +63,7 @@ interface CollectionTreeProps {
 
 export function CollectionTree({
   collections,
+  query,
   onRenameCollection,
   onDeleteCollection,
   onRunCollection,
@@ -63,6 +77,50 @@ export function CollectionTree({
   onMoveNode,
 }: CollectionTreeProps) {
   const treeState = useCollectionTreeState();
+
+  // Ephemeral, fresh per keystroke, and never written back to treeState's
+  // persisted expand state — clearing the query reverts to exactly whatever
+  // was expanded before searching.
+  const revealIds = useMemo(
+    () => (query.trim() !== "" ? collectContainerIds(collections) : NO_REVEAL_IDS),
+    [collections, query]
+  );
+
+  // A revealed container still needs to be manually closable — otherwise a
+  // click on its chevron while searching visibly does nothing, since it'd
+  // stay force-opened by revealIds regardless. Tracks ids the user
+  // explicitly closed while they were force-opened, ephemeral like revealIds
+  // itself: reset on every keystroke ("adjusting state during render" rather
+  // than an effect, so the reset lands in the same commit as the new
+  // query's revealIds instead of flashing open-then-closed a frame later).
+  const [collapsedReveals, setCollapsedReveals] = useState<ReadonlySet<string>>(NO_REVEAL_IDS);
+  const [queryAtLastReset, setQueryAtLastReset] = useState(query);
+  if (query !== queryAtLastReset) {
+    setQueryAtLastReset(query);
+    setCollapsedReveals(NO_REVEAL_IDS);
+  }
+
+  const isOpen = useCallback(
+    (id: string, defaultOpen: boolean) =>
+      revealIds.has(id) ? !collapsedReveals.has(id) : treeState.isOpen(id, defaultOpen),
+    [revealIds, collapsedReveals, treeState.isOpen]
+  );
+
+  const setOpen = useCallback(
+    (id: string, open: boolean) => {
+      if (revealIds.has(id)) {
+        setCollapsedReveals((current) => {
+          const next = new Set(current);
+          if (open) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+        return;
+      }
+      treeState.setOpen(id, open);
+    },
+    [revealIds, treeState.setOpen]
+  );
 
   // Only non-empty folders/collections get a confirmation — deleting a lone
   // request or an already-empty container is low-risk and stays instant.
@@ -144,17 +202,18 @@ export function CollectionTree({
     const overId = event.over ? String(event.over.id) : null;
     if (overId === dwellTargetIdRef.current) return;
     clearDwell();
-    if (overId === null || treeState.isOpen(overId, false)) return;
+    if (overId === null || isOpen(overId, false)) return;
 
     const isCollection = collections.some((c) => c.id === overId);
     const location = isCollection ? null : locateNode(collections as Collection[], overId);
     if (!isCollection && location?.node.type !== "folder") return;
 
     dwellTargetIdRef.current = overId;
-    dwellTimerRef.current = window.setTimeout(() => treeState.setOpen(overId, true), DRAG_EXPAND_DWELL_MS);
+    dwellTimerRef.current = window.setTimeout(() => setOpen(overId, true), DRAG_EXPAND_DWELL_MS);
   }
 
   const handlers: TreeHandlers = {
+    query,
     renamingId: treeState.renamingId,
     onStartRename: treeState.startRenaming,
     onCancelRename: treeState.cancelRenaming,
@@ -164,8 +223,8 @@ export function CollectionTree({
     onRunNode,
     onRenameNode,
     requestDeleteNode,
-    isOpen: treeState.isOpen,
-    setOpen: treeState.setOpen,
+    isOpen,
+    setOpen,
     isDragActive: draggedNodeId !== null,
   };
 
@@ -198,15 +257,17 @@ export function CollectionTree({
     >
       <div className="flex flex-col gap-0.5">
         {collections.length === 0 ? (
-          <p className="px-2 py-1.5 text-sm text-muted-foreground">No collections yet.</p>
+          <p className="px-2 py-1.5 text-sm text-muted-foreground">
+            {query.trim() !== "" ? `No matches for "${query.trim()}".` : "No collections yet."}
+          </p>
         ) : (
           collections.map((collection) => (
             <CollectionRow
               key={collection.id}
               collection={collection}
               isRenaming={treeState.renamingId === collection.id}
-              isOpen={treeState.isOpen}
-              setOpen={treeState.setOpen}
+              isOpen={isOpen}
+              setOpen={setOpen}
               onStartRename={treeState.startRenaming}
               onCancelRename={treeState.cancelRenaming}
               onRenameCollection={onRenameCollection}

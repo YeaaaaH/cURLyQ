@@ -3,6 +3,35 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Sidebar search (2026-08-06)
+
+`SidebarSearchAndAdd.tsx`'s search input is now wired up, filtering both
+Collections and Environments from one shared box:
+
+- `query` state lives in `Sidebar.tsx` (plain `useState`, not persisted —
+  search text doesn't survive a reload), feeding memoized
+  `filterCollections`/`filterEnvironments` (new in `lib/collections.ts` /
+  `lib/environments.ts`) down into `CollectionsSection`/`CollectionTree` and
+  `EnvironmentsSection`.
+- Strict, recursive name match: a request/folder/environment only survives
+  if its own name matches, or (for a folder/collection) it has a matching
+  descendant — a matching container's own items are still filtered down to
+  just the matches, never revealed whole.
+- Matched substrings are highlighted (new `HighlightMatch.tsx`, a `<mark>`
+  wrapper) in collection/folder/request/environment names.
+- Auto-expand-to-reveal: an ephemeral, per-keystroke set of container ids
+  that must be open to show current matches is OR'd into
+  `CollectionTree.tsx`'s `isOpen`, read-only against `useCollectionTreeState`'s
+  persisted `expandedById`. A revealed folder can still be manually
+  collapsed during search (tracked in a separate ephemeral `collapsedReveals`
+  override, reset every keystroke) rather than being stuck open. Same
+  ephemeral-override idea for the Collections/Environments section-level
+  collapse, factored into a shared `useSearchForcedOpen` hook. Clearing the
+  query always reverts every override to exactly the state from before
+  searching — nothing during a search ever touches persisted expand state.
+- "No matches for '...'" empty state alongside `CollectionTree.tsx`'s
+  existing "No collections yet." message.
+
 ## Variable/scripting polish batch (2026-08-04)
 
 Three small items pulled off the backlog together:

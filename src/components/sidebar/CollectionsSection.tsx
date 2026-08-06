@@ -4,10 +4,12 @@ import { cn } from "@/lib/utils";
 import type { Collection, CollectionNode, RequestNode } from "@/lib/collections";
 import { CollectionTree } from "@/components/collection-tree/CollectionTree";
 import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
+import { useSearchForcedOpen } from "@/hooks/useSearchForcedOpen";
 import { COLLECTIONS_SECTION_OPEN_KEY } from "./constants";
 
 interface CollectionsSectionProps {
   collections: readonly Collection[];
+  query: string;
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
   onRunCollection: (id: string) => void;
@@ -23,6 +25,7 @@ interface CollectionsSectionProps {
 
 export function CollectionsSection({
   collections,
+  query,
   onRenameCollection,
   onDeleteCollection,
   onRunCollection,
@@ -40,11 +43,12 @@ export function CollectionsSection({
   // section would still leave its wrapper claiming all leftover sidebar
   // height for nothing, pushing Environments/the log panel down behind a
   // dead gap instead of the two sections sitting flush together.
-  const [isOpen, setIsOpen] = usePersistedBoolean(COLLECTIONS_SECTION_OPEN_KEY, true);
+  const [persistedOpen, setPersistedOpen] = usePersistedBoolean(COLLECTIONS_SECTION_OPEN_KEY, true);
+  const [isOpen, setOpen] = useSearchForcedOpen(query, persistedOpen, setPersistedOpen);
 
   return (
     <div className={cn("flex min-h-0 flex-col", isOpen && "flex-1")}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex min-h-0 flex-1 flex-col">
+      <Collapsible open={isOpen} onOpenChange={setOpen} className="flex min-h-0 flex-1 flex-col">
         <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />
           Collections
@@ -52,6 +56,7 @@ export function CollectionsSection({
         <CollapsibleContent className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pl-3">
           <CollectionTree
             collections={collections}
+            query={query}
             onRenameCollection={onRenameCollection}
             onDeleteCollection={onDeleteCollection}
             onRunCollection={onRunCollection}
