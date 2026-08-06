@@ -1,6 +1,7 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HighlightMatch } from "@/components/HighlightMatch";
 import { METHOD_COLORS } from "@/lib/http";
 import type { Collection, CollectionNode, FolderNode, RequestNode } from "@/lib/collections";
 import { NodeMenu, QuickAddRequestButton, RenameInput } from "./TreeControls";
@@ -90,7 +91,9 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
                 onCancel={onCancelRename}
               />
             ) : (
-              <span className="min-w-0 flex-1 truncate">{node.name}</span>
+              <span className="min-w-0 flex-1 truncate">
+                <HighlightMatch text={node.name} query={handlers.query} />
+              </span>
             )}
           </CollapsibleTrigger>
           <QuickAddRequestButton onClick={addRequestToFolder} />
@@ -172,7 +175,9 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
             onCancel={onCancelRename}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          <span className="min-w-0 flex-1 truncate">
+            <HighlightMatch text={node.name} query={handlers.query} />
+          </span>
         )}
       </button>
       <NodeMenu onRename={() => onStartRename(node.id)} onDelete={() => requestDeleteNode(collectionId, node)} />
@@ -253,7 +258,9 @@ export function CollectionRow({
               onCancel={onCancelRename}
             />
           ) : (
-            <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+            <span className="min-w-0 flex-1 truncate">
+              <HighlightMatch text={collection.name} query={handlers.query} />
+            </span>
           )}
         </CollapsibleTrigger>
         <QuickAddRequestButton onClick={addRootRequest} />

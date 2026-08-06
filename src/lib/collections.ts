@@ -120,6 +120,63 @@ function containsId(node: CollectionNode, id: string): boolean {
   return node.type === "folder" && node.items.some((child) => containsId(child, id));
 }
 
+// Every folder/collection id in `collections` — used against an
+// already-filtered tree (see filterCollections) to force open exactly the
+// containers that either matched the search query or lead to a descendant
+// that did, without touching the tree's persisted expand state.
+export function collectContainerIds(collections: readonly Collection[]): Set<string> {
+  const ids = new Set<string>();
+  function walkItems(items: CollectionNode[]) {
+    for (const node of items) {
+      if (node.type !== "folder") continue;
+      ids.add(node.id);
+      walkItems(node.items);
+    }
+  }
+  for (const collection of collections) {
+    ids.add(collection.id);
+    walkItems(collection.items);
+  }
+  return ids;
+}
+
+// Strict, recursive name filter: a request is kept only if its own name
+// matches `query`; a folder is kept only if its own name matches OR
+// filtering its children down leaves something — either way its `items` are
+// always the filtered set, never the original unfiltered children, so a
+// matching folder shows only its matching requests/subfolders, not
+// everything nested inside it.
+function filterItems(items: CollectionNode[], query: string): CollectionNode[] {
+  return items.reduce<CollectionNode[]>((matched, node) => {
+    if (node.type === "request") {
+      if (node.name.toLowerCase().includes(query)) matched.push(node);
+      return matched;
+    }
+    const filteredChildren = filterItems(node.items, query);
+    if (node.name.toLowerCase().includes(query) || filteredChildren.length > 0) {
+      matched.push({ ...node, items: filteredChildren });
+    }
+    return matched;
+  }, []);
+}
+
+// Filters every collection down to folders/requests matching `query` by
+// name (see filterItems) — a collection is kept only if its own name
+// matches or it has a matching descendant, and its items are always the
+// filtered set. A blank query returns `collections` unchanged.
+export function filterCollections(collections: readonly Collection[], query: string): Collection[] {
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed === "") return collections as Collection[];
+
+  return collections.reduce<Collection[]>((matched, collection) => {
+    const filteredItems = filterItems(collection.items, trimmed);
+    if (collection.name.toLowerCase().includes(trimmed) || filteredItems.length > 0) {
+      matched.push({ ...collection, items: filteredItems });
+    }
+    return matched;
+  }, []);
+}
+
 export function renameCollection(collections: Collection[], id: string, name: string): Collection[] {
   return collections.map((c) => (c.id === id ? { ...c, name } : c));
 }

@@ -29,6 +29,14 @@ const CAPITAL_NAMES = [
   "Stockholm", "Tallinn", "Tokyo", "Vienna", "Warsaw", "Wellington", "Zagreb",
 ];
 
+// Keeps only environments whose name matches `query` (case-insensitive). A
+// blank query returns `environments` unchanged.
+export function filterEnvironments(environments: readonly Environment[], query: string): Environment[] {
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed === "") return environments as Environment[];
+  return environments.filter((environment) => environment.name.toLowerCase().includes(trimmed));
+}
+
 export function nextEnvironmentName(existing: Environment[]): string {
   const usedNames = new Set(existing.map((e) => e.name));
   const capital = CAPITAL_NAMES.find((name) => !usedNames.has(name));

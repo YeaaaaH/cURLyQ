@@ -9,40 +9,6 @@ improvement, not walled off by a "v1"/"out of scope" boundary anymore.
 running app, then mark it done here (and move a short summary to `done.md`) before
 starting the next.
 
-## Sidebar search
-
-`SidebarSearchAndAdd.tsx`'s search input is an unwired shell — needs actual
-filtering wired up. Design agreed, not yet built:
-
-- Lift `query` state (plain `useState<string>`, not persisted — search text
-  shouldn't survive a reload) up to `Sidebar.tsx`, controlling the `Input`
-  and passed down to both `CollectionsSection`/`CollectionTree` and
-  `EnvironmentsSection`.
-- Match names only (folder/request/environment names), not method/URL —
-  keeps it simple.
-- One shared search box filters both Collections and Environments at once,
-  not a separate box per section.
-- Add `filterCollections(collections, query)` to `lib/collections.ts` —
-  recursive, a node matches if its own name matches or any descendant does
-  (so ancestor folders stay visible around a match), alongside the tree's
-  other structural helpers (`locateNode`, `mapItems`, etc). A simple name
-  filter for environments too.
-- Auto-expand-to-reveal: compute an *ephemeral* set of ancestor ids that
-  must be open to show current matches, fresh per keystroke, and OR it into
-  `CollectionTree.tsx`'s `treeState.isOpen` read only — never written to the
-  persisted `expandedById` in `useCollectionTreeState`, so clearing the
-  query reverts to exactly the expand state from before searching. Same
-  ephemeral-override idea for the Collections/Environments section-level
-  collapse (now `usePersistedBoolean`-backed) so a match auto-opens a
-  collapsed section without touching its persisted state.
-- Add a "No matches for '...'" empty state alongside `CollectionTree.tsx`'s
-  existing "No collections yet." message.
-
-Medium effort: the query plumbing and basic filtering are small and
-mechanical; the auto-expand-reveal layer is the tricky part, since it must
-not disturb persisted expand state. Worth two review checkpoints — (1) query
-plumbing + basic filtering, (2) auto-expand-reveal on top.
-
 ## Workflows (flows)
 
 Mid-term goal. Postman-inspired but deliberately lighter: a visual chain of

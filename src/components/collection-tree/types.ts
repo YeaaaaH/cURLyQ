@@ -8,6 +8,7 @@ export type OpenRequest = (collectionId: string, node: RequestNode) => void;
 // Bag of callbacks + UI state threaded down through every row in the tree —
 // shared by CollectionRow, NodeRow, FolderRow, and RequestRow.
 export interface TreeHandlers {
+  query: string;
   renamingId: string | null;
   onStartRename: (id: string) => void;
   onCancelRename: () => void;
