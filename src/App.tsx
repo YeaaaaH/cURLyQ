@@ -118,6 +118,7 @@ function App() {
       onRenameCollectionNode: collectionsApi.handleRenameCollectionNode,
       onDeleteCollectionNode: collectionsApi.handleDeleteCollectionNode,
       onMoveCollectionNode: collectionsApi.handleMoveCollectionNode,
+      runningId: collectionRun.runningId,
     }),
     [
       collections,
@@ -134,6 +135,7 @@ function App() {
       collectionsApi.handleRenameCollectionNode,
       collectionsApi.handleDeleteCollectionNode,
       collectionsApi.handleMoveCollectionNode,
+      collectionRun.runningId,
     ]
   );
 

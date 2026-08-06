@@ -59,6 +59,7 @@ interface CollectionTreeProps {
   onRenameNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteNode: (collectionId: string, nodeId: string) => void;
   onMoveNode: (draggedId: string, targetId: string) => void;
+  runningId: string | null;
 }
 
 export function CollectionTree({
@@ -75,6 +76,7 @@ export function CollectionTree({
   onRenameNode,
   onDeleteNode,
   onMoveNode,
+  runningId,
 }: CollectionTreeProps) {
   const treeState = useCollectionTreeState();
 
@@ -226,6 +228,7 @@ export function CollectionTree({
     isOpen,
     setOpen,
     isDragActive: draggedNodeId !== null,
+    runningId,
   };
 
   function handleDragStart(event: DragStartEvent) {
@@ -277,6 +280,7 @@ export function CollectionTree({
               onAddFolder={onAddFolder}
               onAddRequest={onAddRequest}
               handlers={handlers}
+              runningId={runningId}
             />
           ))
         )}

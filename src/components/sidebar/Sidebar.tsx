@@ -26,6 +26,7 @@ interface CollectionsProps {
   onRenameCollectionNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteCollectionNode: (collectionId: string, nodeId: string) => void;
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
+  runningId: string | null;
 }
 
 interface EnvironmentsProps {
@@ -137,6 +138,7 @@ export const Sidebar = memo(function Sidebar({
             onRenameNode={collectionsProps.onRenameCollectionNode}
             onDeleteNode={collectionsProps.onDeleteCollectionNode}
             onMoveNode={collectionsProps.onMoveCollectionNode}
+            runningId={collectionsProps.runningId}
           />
 
           <EnvironmentsSection

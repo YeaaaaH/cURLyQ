@@ -21,6 +21,7 @@ interface CollectionsSectionProps {
   onRenameNode: (collectionId: string, nodeId: string, name: string) => void;
   onDeleteNode: (collectionId: string, nodeId: string) => void;
   onMoveNode: (draggedId: string, targetId: string) => void;
+  runningId: string | null;
 }
 
 export function CollectionsSection({
@@ -37,6 +38,7 @@ export function CollectionsSection({
   onRenameNode,
   onDeleteNode,
   onMoveNode,
+  runningId,
 }: CollectionsSectionProps) {
   // Controlled (rather than the Collapsible's own defaultOpen) so the
   // wrapper's flex-1 can be gated on it below — otherwise collapsing this
@@ -68,6 +70,7 @@ export function CollectionsSection({
             onRenameNode={onRenameNode}
             onDeleteNode={onDeleteNode}
             onMoveNode={onMoveNode}
+            runningId={runningId}
           />
         </CollapsibleContent>
       </Collapsible>

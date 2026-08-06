@@ -25,12 +25,12 @@ function EnvironmentRow({ environment, query, active, onSelect, onExport, onEdit
         type="button"
         onClick={onSelect}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 truncate px-2 py-1.5 text-left text-sm",
+          "flex min-w-0 flex-1 items-center gap-2 truncate rounded-md px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring-glow",
           active ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
         )}
       >
         <span className={cn("size-1.5 shrink-0 rounded-full", active ? "bg-success" : "bg-border")} aria-hidden />
-        <span className="min-w-0 flex-1 truncate">
+        <span className="min-w-0 flex-1 truncate" title={environment.name}>
           <HighlightMatch text={environment.name} query={query} />
         </span>
       </button>
@@ -97,23 +97,29 @@ export function EnvironmentsSection({
         Environments
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-1 pl-3">
-        <div
-          className="scrollbar-thin flex flex-col gap-0.5 overflow-y-auto"
-          style={{ maxHeight: CAPPED_LIST_MAX_HEIGHT_PX }}
-        >
-          {environments.map((environment) => (
-            <EnvironmentRow
-              key={environment.id}
-              environment={environment}
-              query={query}
-              active={environment.id === activeEnvironmentId}
-              onSelect={() => onSelectEnvironment(environment.id)}
-              onExport={() => onExportEnvironment(environment.id)}
-              onEdit={() => onEditEnvironment(environment.id)}
-              onDelete={() => onDeleteEnvironment(environment.id)}
-            />
-          ))}
-        </div>
+        {environments.length === 0 ? (
+          <p className="px-2 py-1 text-xs text-muted-foreground">
+            {query.trim() !== "" ? `No matches for "${query.trim()}".` : "No environments yet."}
+          </p>
+        ) : (
+          <div
+            className="scrollbar-thin flex flex-col gap-0.5 overflow-y-auto"
+            style={{ maxHeight: CAPPED_LIST_MAX_HEIGHT_PX }}
+          >
+            {environments.map((environment) => (
+              <EnvironmentRow
+                key={environment.id}
+                environment={environment}
+                query={query}
+                active={environment.id === activeEnvironmentId}
+                onSelect={() => onSelectEnvironment(environment.id)}
+                onExport={() => onExportEnvironment(environment.id)}
+                onEdit={() => onEditEnvironment(environment.id)}
+                onDelete={() => onDeleteEnvironment(environment.id)}
+              />
+            ))}
+          </div>
+        )}
       </CollapsibleContent>
     </Collapsible>
   );

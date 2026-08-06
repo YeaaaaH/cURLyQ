@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { VariableLookup } from "@/lib/variables/context";
 import type { Environment } from "@/lib/environments";
@@ -20,14 +20,24 @@ export function useCollectionRun({
   applyEnvironmentPatch,
   addRunResultTab,
 }: UseCollectionRunParams) {
+  // Which collection/folder node is currently running, so the tree can show
+  // a spinner on that row instead of leaving the Run action's completion
+  // invisible until the result tab appears.
+  const [runningId, setRunningId] = useState<string | null>(null);
+
   const runAndReport = useCallback(
-    async (requests: RequestNode[], label: string) => {
+    async (id: string, requests: RequestNode[], label: string) => {
       if (requests.length === 0) {
         toast.info(`"${label}" has no requests to run.`);
         return;
       }
-      const result = await runCollectionRequests(requests, variableContext, activeEnvironment, applyEnvironmentPatch);
-      addRunResultTab(label, result);
+      setRunningId(id);
+      try {
+        const result = await runCollectionRequests(requests, variableContext, activeEnvironment, applyEnvironmentPatch);
+        addRunResultTab(label, result);
+      } finally {
+        setRunningId(null);
+      }
     },
     [variableContext, activeEnvironment, applyEnvironmentPatch, addRunResultTab]
   );
@@ -36,17 +46,17 @@ export function useCollectionRun({
     (id: string) => {
       const collection = collections.find((c) => c.id === id);
       if (!collection) return;
-      runAndReport(collection.items.flatMap(collectRequestNodes), collection.name);
+      runAndReport(id, collection.items.flatMap(collectRequestNodes), collection.name);
     },
     [collections, runAndReport]
   );
 
   const handleRunNode = useCallback(
     (_collectionId: string, node: CollectionNode) => {
-      runAndReport(collectRequestNodes(node), node.name);
+      runAndReport(node.id, collectRequestNodes(node), node.name);
     },
     [runAndReport]
   );
 
-  return { handleRunCollection, handleRunNode };
+  return { handleRunCollection, handleRunNode, runningId };
 }

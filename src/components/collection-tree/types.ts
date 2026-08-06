@@ -21,6 +21,7 @@ export interface TreeHandlers {
   isOpen: (id: string, defaultOpen: boolean) => boolean;
   setOpen: SetExpanded;
   isDragActive: boolean;
+  runningId: string | null;
 }
 
 // Explicit, serializable delete-confirmation state — avoids storing a
