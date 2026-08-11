@@ -78,29 +78,74 @@ workerScope.onmessage = (e: MessageEvent<ScriptRunRequest>) => {
   if (kind === "pre-request" && request) {
     const headersView: Record<string, string> = { ...request.headers };
     let bodyView = request.body;
+
+    function setHeader(key: string, value: string) {
+      if (value === undefined) {
+        post({ type: "log", line: `[warn] ctx.request.headers.set("${key}", undefined) ignored — no value to set.` });
+        return;
+      }
+      const stringValue = toStringValue(value);
+      headersView[key] = stringValue;
+      post({ type: "headerSet", key, value: stringValue });
+    }
+
+    function setBody(value: string) {
+      if (value === undefined) {
+        post({ type: "log", line: "[warn] ctx.request.body.set(undefined) ignored — no value to set." });
+        return;
+      }
+      const stringValue = toStringValue(value);
+      bodyView = stringValue;
+      post({ type: "bodySet", value: stringValue });
+    }
+
+    // Real Postman's `.add`/`.upsert` take a single {key, value} object, not
+    // two positional args like `.set` — but nothing stops a script here from
+    // calling them the `.set`-style way out of habit (positional args
+    // destructured as {key, value} silently produce two `undefined`s, not an
+    // error, so it'd otherwise fail quietly). Accepting both shapes costs
+    // nothing: only the exported *text* has to match real Postman, not how
+    // forgiving our own runtime is about parsing it.
+    function resolveHeaderArgs(a: unknown, b: unknown): { key: string; value: string } | null {
+      if (typeof a === "string") return { key: a, value: b as string };
+      if (a && typeof a === "object" && "key" in a) {
+        const obj = a as { key: string; value: string };
+        return { key: obj.key, value: obj.value };
+      }
+      return null;
+    }
+
     ctx.request = {
       headers: {
         get: (key: string) => headersView[key],
-        set: (key: string, value: string) => {
-          if (value === undefined) {
-            post({ type: "log", line: `[warn] ctx.request.headers.set("${key}", undefined) ignored — no value to set.` });
-            return;
-          }
-          const stringValue = toStringValue(value);
-          headersView[key] = stringValue;
-          post({ type: "headerSet", key, value: stringValue });
+        set: setHeader,
+        add: (a: unknown, b?: unknown) => {
+          const resolved = resolveHeaderArgs(a, b);
+          if (resolved) setHeader(resolved.key, resolved.value);
+        },
+        upsert: (a: unknown, b?: unknown) => {
+          const resolved = resolveHeaderArgs(a, b);
+          if (resolved) setHeader(resolved.key, resolved.value);
         },
       },
+      // Real Postman has no `ctx`-style `.set(value)` either — the idiomatic
+      // forms are direct assignment (`pm.request.body.raw = "..."`) or
+      // `.update({ mode, raw, options })`. `.get`/`.set` stay as cURLyQ's own
+      // convenience methods; `raw` (a getter/setter, not a plain field) and
+      // `update` are additive aliases of the same underlying write so a
+      // script using either style behaves identically here.
       body: {
         get: () => bodyView,
-        set: (value: string) => {
-          if (value === undefined) {
-            post({ type: "log", line: "[warn] ctx.request.body.set(undefined) ignored — no value to set." });
-            return;
-          }
-          const stringValue = toStringValue(value);
-          bodyView = stringValue;
-          post({ type: "bodySet", value: stringValue });
+        set: setBody,
+        get raw() {
+          return bodyView;
+        },
+        set raw(value: string) {
+          setBody(value);
+        },
+        update: (next: unknown) => {
+          const raw = typeof next === "string" ? next : (next as { raw?: unknown } | null)?.raw;
+          if (typeof raw === "string") setBody(raw);
         },
       },
     };
@@ -109,6 +154,12 @@ workerScope.onmessage = (e: MessageEvent<ScriptRunRequest>) => {
   if (kind === "post-response" && response) {
     ctx.response = {
       status: response.status,
+      // Real Postman's numeric status code is `.code`; `.status` there is
+      // the string reason phrase ("OK"), which cURLyQ doesn't have (the
+      // backend only forwards the numeric code) — `.status` keeps its
+      // existing numeric meaning for cURLyQ-native scripts, `.code` is the
+      // Postman-shaped alias carrying the same number.
+      code: response.status,
       headers: { ...response.headers },
       body: response.body,
       json: () => JSON.parse(response.body),
@@ -123,8 +174,13 @@ workerScope.onmessage = (e: MessageEvent<ScriptRunRequest>) => {
 
   let error: string | null = null;
   try {
-    const run = new Function("ctx", "console", script);
-    run(ctx, sandboxConsole);
+    // `pm` is a literal alias for `ctx`, not a separate implementation — a
+    // script can use either prefix and get identical behavior, since both
+    // names point at the same object. This only covers what `ctx` already
+    // implements; scripts relying on Postman-only surface (pm.test,
+    // pm.expect, pm.sendRequest, pm.variables) still fail, same as before.
+    const run = new Function("ctx", "pm", "console", script);
+    run(ctx, ctx, sandboxConsole);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

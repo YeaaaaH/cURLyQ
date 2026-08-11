@@ -181,10 +181,14 @@ export function useCollections({
         kind: "collection",
         fallbackLabel: collection.name,
         operation: async () => {
-          const json = JSON.stringify(buildPostmanCollection(collection), null, 2);
-          await invoke("write_text_file", { path, contents: json });
+          const { json, rewrittenScriptCount } = buildPostmanCollection(collection);
+          await invoke("write_text_file", { path, contents: JSON.stringify(json, null, 2) });
           const detail = describeCollectionCounts(collection.items);
-          return { label: collection.name, detail };
+          const toastDescription =
+            rewrittenScriptCount > 0
+              ? `${detail} — ${pluralize(rewrittenScriptCount, "script")} rewritten from ctx to pm for Postman compatibility, double-check before use outside cURLyQ`
+              : undefined;
+          return { label: collection.name, detail, toastDescription };
         },
       });
     },

@@ -9,6 +9,29 @@ improvement, not walled off by a "v1"/"out of scope" boundary anymore.
 running app, then mark it done here (and move a short summary to `done.md`) before
 starting the next.
 
+## Security
+
+The sharpest gap in the current backlog — the failure mode here is "your API
+key leaves your machine," not "a feature is missing."
+
+- Environment variables have no "secret" type — stored as plain
+  `{key, value}` in unencrypted `environments.json`, and the full flattened
+  environment is handed to every pre/post-request script via
+  `ctx.environment`. Add a `KeyValuePair`-shaped `isSecret` flag, mask secret
+  values at rest and in the UI (Postman-style eye-toggle), and reconsider
+  what a script's `ctx.environment` should expose once scripts can come from
+  an untrusted import (see Scripting polish below).
+- The script sandbox (`sandbox.worker.ts`) is a crash/hang boundary (timeout
+  + terminate), not a security boundary — it's a Web Worker with
+  `new Function`, still has `fetch`/`XMLHttpRequest`. Document this
+  explicitly (README or in-app copy near the Scripts tab) so it's a known
+  tradeoff, not a silent assumption.
+- `tauri.conf.json` sets `"csp": null`, and `read_text_file`/`write_text_file`
+  accept an arbitrary path string with no allowlisting. No live exploit
+  today (response rendering is plain `<pre>`, no `dangerouslySetInnerHTML`),
+  but there's no defense-in-depth backstop if that ever changes. Set a real
+  CSP and consider scoping the fs commands to dialog-picked paths only.
+
 ## Workflows (flows)
 
 Mid-term goal. Postman-inspired but deliberately lighter: a visual chain of
@@ -67,12 +90,32 @@ Design decisions made during brainstorming:
 
 ## Scripting polish
 
-- Postman's own `event`/`exec` script arrays aren't mapped on import/export —
-  an imported Postman collection's scripts are silently dropped
-  (`collections.ts` hardcodes both to `""` on import). Scope narrowly first:
+- **Export is done** (see `done.md`) — Postman's `event`/`exec` script
+  array, a Postman-shaped headers/body/response API on `ctx`, and a
+  `disableBodyPruning` flag for GET-with-body requests are all wired up and
+  verified against real Postman. Only **import** remains: Postman's
+  `event`/`exec` scripts are still silently dropped on import
+  (`collections.ts` hardcodes both to `""`). Scope narrowly first:
   request-level scripts only, not folder/collection-level inherited scripts
   (Postman allows scripts at any of those levels) — that inheritance question
   needs its own decision before extending further.
+- Postman scripts use the `pm.*` API (`pm.environment`, `pm.test()`,
+  `pm.expect()`, `pm.sendRequest()`, `pm.variables`, `pm.collectionVariables`);
+  cURLyQ's `ctx.*` now covers headers/body/response in Postman's own shape
+  (see `done.md`) but still has no assertion framework or async
+  sub-requests. A naive plumbing fix would still import scripts that throw
+  on anything beyond environment/headers/body/response (e.g.
+  `pm.test is not a function`). Two viable increments, in order: (1) import
+  raw script text as-is with a visible "uses Postman's `pm` API, may still
+  need rewriting" notice — safe, honest, unblocks the plumbing gap now; (2)
+  build out `pm.test`/`pm.expect` (Chai-style assertions)/`pm.sendRequest`/
+  `pm.variables`/`pm.collectionVariables` as a separate, larger later piece
+  once it's clear how much of Postman's scripting API is worth
+  reimplementing.
+- Import should show a "this collection contains N scripts — review before
+  enabling" prompt rather than silently populating and running them — this
+  is the actual point an untrusted script could reach `ctx.environment`,
+  ties directly into the Security section above.
 
 ## Body editor polish
 
@@ -90,6 +133,33 @@ Design decisions made during brainstorming:
   Recommendation: ship the naive strip-comments version first, only invest
   in comment-preservation if it turns out people actually rely on Body
   comments enough to miss them.
+
+## HTTP feature coverage
+
+- HEAD/OPTIONS methods (currently GET/POST/PUT/PATCH/DELETE only).
+- `multipart/form-data` / file-upload body type — only raw/JSON text today.
+- Request cancellation — no `AbortController` in `requestSend.ts`, no cancel
+  button; a hung request only ends via the hardcoded 30s server timeout, and
+  a collection run can't be stopped mid-flight.
+- Response body is read fully via `.text()` — errors outright on
+  binary/non-UTF8 responses, no size cap, fully buffered in memory. Needs a
+  content-type/size check before deciding text vs. binary handling.
+- Cookie jar, proxy config, client-cert/TLS options — all absent from the
+  shared `reqwest::Client`.
+- Per-request timeout override (currently hardcoded 30s for every request
+  via the shared client).
+
+## Testing & CI
+
+- Zero frontend test coverage — no vitest/jest, nothing in `package.json`
+  devDependencies — despite the variable tokenizer/resolver (cycle
+  detection), Postman import/export mapping, drag-and-drop collection-tree
+  reordering, and collection-run sequencing all living in `src/lib` with
+  real logic worth pinning down. Add vitest, start with the variable
+  resolver (highest-risk, most self-contained).
+- No ESLint config at all; CI's "frontend" job is just `tsc && vite build`.
+- Rust side: only 2 tests, both on `Collection` serde tagging. `send_request`
+  and the save/load JSON paths have no coverage.
 
 ## Not yet prioritized
 

@@ -37,6 +37,49 @@ export function syncUrlWithParams(rawUrl: string, params: KeyValuePair[]): strin
   return buildDisplayUrl(rawUrl, params);
 }
 
+// Postman's own request-detail UI (address bar, Params tab, and apparently
+// whatever else shares that render path) is driven by the url object's
+// parsed `host`/`path`/`query`, not `raw` — `raw` is redundant/duplicate
+// info Postman keeps in sync with those, not a fallback source of truth. An
+// exported `{ raw }`-only url object renders as blank in real Postman even
+// though the text is right there. String splicing rather than the URL API,
+// same reasoning as buildDisplayUrl: `{{baseUrl}}/path` isn't a parseable
+// absolute URL, but still needs a host/path split.
+export function buildPostmanUrlObject(
+  rawUrl: string,
+  params: KeyValuePair[]
+): { raw: string; protocol?: string; host?: string[]; path?: string[]; query?: unknown[] } {
+  const hashIndex = rawUrl.indexOf("#");
+  const withoutHash = hashIndex === -1 ? rawUrl : rawUrl.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  const base = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
+
+  const protocolMatch = base.match(/^([a-zA-Z][a-zA-Z\d+\-.]*):\/\//);
+  const protocol = protocolMatch ? protocolMatch[1] : undefined;
+  const afterProtocol = protocolMatch ? base.slice(protocolMatch[0].length) : base;
+
+  const slashIndex = afterProtocol.indexOf("/");
+  const hostPart = slashIndex === -1 ? afterProtocol : afterProtocol.slice(0, slashIndex);
+  const pathPart = slashIndex === -1 ? "" : afterProtocol.slice(slashIndex + 1);
+
+  // A bare `{{baseUrl}}` host has no literal dots, so splitting on "." still
+  // yields the single-element array Postman's own exports use for a
+  // variable-only host — this doesn't need a special case.
+  const host = hostPart === "" ? [] : hostPart.split(".");
+  const path = pathPart === "" ? [] : pathPart.split("/").filter((segment) => segment !== "");
+  const query = params
+    .filter((p) => p.key.trim() !== "")
+    .map((p) => ({ key: p.key, value: p.value, ...(p.enabled ? {} : { disabled: true }) }));
+
+  return {
+    raw: rawUrl,
+    ...(protocol ? { protocol } : {}),
+    ...(host.length > 0 ? { host } : {}),
+    ...(path.length > 0 ? { path } : {}),
+    ...(query.length > 0 ? { query } : {}),
+  };
+}
+
 export function unescapeFromDisplay(value: string): string {
   return value.replace(/%23|%26|%3d/gi, (seq) => decodeURIComponent(seq));
 }

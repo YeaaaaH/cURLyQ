@@ -20,26 +20,28 @@ const TABS: { id: ScriptsSubTab; label: string }[] = [
 ];
 
 const PLACEHOLDERS: Record<ScriptHalf, string> = {
-  "pre-request": `ctx.environment.set("timestamp", Date.now().toString());`,
-  "post-response": `ctx.environment.set("token", ctx.response.json().token);`,
+  "pre-request": `pm.environment.set("timestamp", Date.now().toString());`,
+  "post-response": `pm.environment.set("token", pm.response.json().token);`,
 };
 
-// Quick-insert buttons for the `ctx` API surface each half of the script
-// actually has (see sandbox.worker.ts) — `ctx.request.*` only exists
-// pre-request, `ctx.response.*` only post-response, `ctx.environment.*` is
-// common to both.
+// Quick-insert buttons use `pm.`-prefixed, Postman-shaped calls (not just
+// the identifier — `.upsert`/`.raw` too, see sandbox.worker.ts) so a script
+// built entirely from these buttons is portable to real Postman by default,
+// not just re-importable into cURLyQ. `ctx.*`/`.set()` still work identically
+// (see sandbox.worker.ts's aliases) for anyone typing by hand who doesn't
+// care about portability — this only changes what the buttons insert.
 const SNIPPETS: Record<ScriptHalf, ScriptSnippet[]> = {
   "pre-request": [
-    { label: "environment.get", insert: 'ctx.environment.get("key")' },
-    { label: "environment.set", insert: 'ctx.environment.set("key", "value");' },
-    { label: "request.headers.set", insert: 'ctx.request.headers.set("Header-Name", "value");' },
-    { label: "request.body.set", insert: "ctx.request.body.set(JSON.stringify(payload));" },
+    { label: "environment.get", insert: 'pm.environment.get("key")' },
+    { label: "environment.set", insert: 'pm.environment.set("key", "value");' },
+    { label: "request.headers.upsert", insert: 'pm.request.headers.upsert({ key: "Header-Name", value: "value" });' },
+    { label: "request.body.raw", insert: "pm.request.body.raw = JSON.stringify(payload);" },
   ],
   "post-response": [
-    { label: "environment.get", insert: 'ctx.environment.get("key")' },
-    { label: "environment.set", insert: 'ctx.environment.set("key", "value");' },
-    { label: "response.status", insert: "ctx.response.status" },
-    { label: "response.json()", insert: "ctx.response.json()" },
+    { label: "environment.get", insert: 'pm.environment.get("key")' },
+    { label: "environment.set", insert: 'pm.environment.set("key", "value");' },
+    { label: "response.code", insert: "pm.response.code" },
+    { label: "response.json()", insert: "pm.response.json()" },
   ],
 };
 
