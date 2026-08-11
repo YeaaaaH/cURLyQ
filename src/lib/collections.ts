@@ -1,5 +1,5 @@
 import type { KeyValuePair } from "@/lib/keyValue";
-import { parseParamsFromUrl } from "@/lib/requestUrl";
+import { buildPostmanUrlObject, parseParamsFromUrl } from "@/lib/requestUrl";
 import { PostmanImportError, dedupeName } from "@/lib/postman";
 
 export interface FolderNode {
@@ -543,38 +543,86 @@ export function parsePostmanCollection(
   };
 }
 
-function buildPostmanItems(items: CollectionNode[]): unknown[] {
+// `ctx` and `pm` are runtime aliases inside cURLyQ's own sandbox (see
+// sandbox.worker.ts) — but real Postman only recognizes `pm`. This swap is
+// textual, not AST-aware: a word-boundary match rewrites the `ctx` identifier
+// wherever it's used as a call target (`ctx.environment.get(...)`) or
+// destructured (`const { environment } = ctx`), but it can't tell a literal
+// "ctx" inside a string or comment from a real reference, so those get
+// rewritten too. Best-effort, not guaranteed — same spirit as the
+// unsupported-body-mode warning below.
+function toPostmanScript(script: string): string {
+  return script.replace(/\bctx\b/g, "pm");
+}
+
+// Builds a request node's `event` array (Postman's pre-request/test script
+// slot). Only requests that actually have a script get an `event` entry —
+// mirrors the `body` field being omitted below when empty. Increments
+// `counter.rewrittenScripts` whenever a script's ctx→pm swap actually changed
+// something, so the caller can surface how many scripts to double-check.
+function buildScriptEvents(node: RequestNode, counter: { rewrittenScripts: number }): unknown[] {
+  const events: unknown[] = [];
+  const addEvent = (listen: "prerequest" | "test", script: string) => {
+    if (script.trim() === "") return;
+    const rewritten = toPostmanScript(script);
+    if (rewritten !== script) counter.rewrittenScripts++;
+    events.push({ listen, script: { type: "text/javascript", exec: rewritten.split("\n") } });
+  };
+  addEvent("prerequest", node.preRequestScript);
+  addEvent("test", node.postResponseScript);
+  return events;
+}
+
+// Postman strips the request body from these methods by default (both when
+// sending and, per real-world exports, in how the client itself treats a
+// saved request) unless `protocolProfileBehavior.disableBodyPruning` is set —
+// https://github.com/postmanlabs/postman-runtime/blob/develop/docs/protocol-profile-behavior.md.
+// Only GET is reachable today (cURLyQ doesn't support the others yet), but
+// checking the full set means this doesn't need revisiting if that changes.
+const BODY_PRUNED_METHODS = new Set(["GET", "HEAD", "COPY", "PURGE", "UNLOCK"]);
+
+function buildPostmanItems(items: CollectionNode[], counter: { rewrittenScripts: number }): unknown[] {
   return items.map((node) => {
     if (node.type === "folder") {
-      return { name: node.name, item: buildPostmanItems(node.items) };
+      return { name: node.name, item: buildPostmanItems(node.items, counter) };
     }
+    const events = buildScriptEvents(node, counter);
+    const hasBody = node.body.trim() !== "";
     return {
       name: node.name,
+      ...(hasBody && BODY_PRUNED_METHODS.has(node.method)
+        ? { protocolProfileBehavior: { disableBodyPruning: true } }
+        : {}),
       request: {
         method: node.method,
         header: node.headers
           .filter((h) => h.key.trim() !== "")
           .map((h) => ({ key: h.key, value: h.value, type: "text", disabled: !h.enabled })),
-        ...(node.body.trim() !== ""
-          ? { body: { mode: "raw", raw: node.body, options: { raw: { language: "json" } } } }
-          : {}),
-        url: { raw: node.url },
+        ...(hasBody ? { body: { mode: "raw", raw: node.body, options: { raw: { language: "json" } } } } : {}),
+        url: buildPostmanUrlObject(node.url, node.params),
       },
+      ...(events.length > 0 ? { event: events } : {}),
     };
   });
 }
 
 // Reverse of parsePostmanCollection above — doesn't try to round-trip an
 // original Postman id/schema-quirk, just needs to be re-importable (by us or
-// real Postman).
-export function buildPostmanCollection(collection: Collection) {
+// real Postman). Returns how many scripts had a ctx→pm rewrite applied
+// alongside the built JSON, for the caller to note in the export log.
+export function buildPostmanCollection(collection: Collection): { json: unknown; rewrittenScriptCount: number } {
+  const counter = { rewrittenScripts: 0 };
+  const item = buildPostmanItems(collection.items, counter);
   return {
-    info: {
-      _postman_id: collection.id,
-      name: collection.name,
-      schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    json: {
+      info: {
+        _postman_id: collection.id,
+        name: collection.name,
+        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item,
     },
-    item: buildPostmanItems(collection.items),
+    rewrittenScriptCount: counter.rewrittenScripts,
   };
 }
 

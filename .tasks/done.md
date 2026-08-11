@@ -3,6 +3,41 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Postman scripting/export compatibility (2026-08-11)
+
+Collection export (`buildPostmanCollection`/`buildPostmanItems` in
+`collections.ts`) now round-trips correctly into real Postman — previously it
+dropped scripts entirely, and the url/body it did emit looked structurally
+valid but silently failed to render in Postman's own client:
+
+- `pm` is now a runtime alias for `ctx` in `sandbox.worker.ts` — a script can
+  use either prefix and get identical behavior. Only covers what `ctx`
+  already implements, not Postman-only surface like `pm.test()`.
+- Export emits Postman's `event`/`exec` script array (previously silently
+  dropped); script text goes through a best-effort `\bctx\b` → `pm`
+  word-boundary rewrite so a ctx-authored script reads as valid Postman
+  syntax. The export toast reports how many scripts were rewritten.
+- Exported `url` objects now include parsed `host`/`path`/`query` alongside
+  `raw` (new `buildPostmanUrlObject` in `requestUrl.ts`) — Postman's
+  request-detail UI renders off the parsed components, not `raw` alone; a
+  `{ raw }`-only url is valid v2.1 JSON but rendered completely blank in
+  real Postman.
+- `ctx.request.headers` gained `.add`/`.upsert` (Postman's real method
+  names — it has no `.set()` at all), accepting either `(key, value)` or
+  `({key, value})` since real Postman only takes the object form.
+  `ctx.request.body` gained a `.raw` getter/setter and `.update({raw})`
+  alongside `.get()`/`.set()`. `ctx.response` gained `.code` (numeric)
+  alongside `.status`, since real Postman's `.status` is the string reason
+  phrase, not the number.
+- Scripts tab quick-insert snippets (`ScriptsTab.tsx`) switched from
+  `ctx.*`/`.set()` to `pm.*` with the real Postman call shapes above, so
+  scripts built entirely from the buttons are portable by default.
+- GET (and HEAD/COPY/PURGE/UNLOCK) requests with a body now export
+  `protocolProfileBehavior: { disableBodyPruning: true }` — Postman prunes
+  request bodies from these methods by default, both when sending and in
+  the editor itself, which was silently eating every GET-with-body export
+  regardless of how correct the rest of the JSON was.
+
 ## Sidebar search (2026-08-06)
 
 `SidebarSearchAndAdd.tsx`'s search input is now wired up, filtering both
