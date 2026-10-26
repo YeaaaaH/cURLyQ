@@ -36,6 +36,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
     onAddRequest,
     onRunNode,
     onRenameNode,
+    onDuplicateNode,
     requestDeleteNode,
     isOpen,
     setOpen,
@@ -114,6 +115,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
             onNewRequest={addRequestToFolder}
             onRun={() => onRunNode(collectionId, node)}
             onRename={() => onStartRename(node.id)}
+            onDuplicate={() => onDuplicateNode(node.id)}
             onDelete={() => requestDeleteNode(collectionId, node)}
             isRunning={isRunning}
           />
@@ -142,7 +144,8 @@ interface RequestRowProps extends BaseNodeRowProps {
 }
 
 function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
-  const { renamingId, onStartRename, onCancelRename, onOpenRequest, onRenameNode, requestDeleteNode } = handlers;
+  const { renamingId, onStartRename, onCancelRename, onOpenRequest, onRenameNode, onDuplicateNode, requestDeleteNode } =
+    handlers;
   const isRenaming = renamingId === node.id;
   const dnd = useTreeDragAndDrop(node.id, isRenaming);
 
@@ -198,7 +201,11 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
           </span>
         </button>
       )}
-      <NodeMenu onRename={() => onStartRename(node.id)} onDelete={() => requestDeleteNode(collectionId, node)} />
+      <NodeMenu
+        onRename={() => onStartRename(node.id)}
+        onDuplicate={() => onDuplicateNode(node.id)}
+        onDelete={() => requestDeleteNode(collectionId, node)}
+      />
     </div>
   );
 }
@@ -214,6 +221,7 @@ export interface CollectionRowProps {
   onRequestDeleteCollection: () => void;
   onRunCollection: (id: string) => void;
   onExportCollection: (id: string) => void;
+  onDuplicateCollection: (id: string) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
   handlers: TreeHandlers;
@@ -231,6 +239,7 @@ export function CollectionRow({
   onRequestDeleteCollection,
   onRunCollection,
   onExportCollection,
+  onDuplicateCollection,
   onAddFolder,
   onAddRequest,
   handlers,
@@ -300,6 +309,7 @@ export function CollectionRow({
           onNewRequest={addRootRequest}
           onRun={() => onRunCollection(collection.id)}
           onRename={() => onStartRename(collection.id)}
+          onDuplicate={() => onDuplicateCollection(collection.id)}
           onExport={() => onExportCollection(collection.id)}
           onDelete={onRequestDeleteCollection}
           isRunning={isRunning}

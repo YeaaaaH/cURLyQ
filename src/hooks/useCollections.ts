@@ -13,6 +13,8 @@ import {
   createRequestNode,
   deleteCollection,
   deleteCollectionNode,
+  duplicateCollection,
+  duplicateCollectionNode,
   findCollectionNode,
   moveNodeRelativeToTarget,
   parsePostmanCollection,
@@ -72,6 +74,13 @@ export function useCollections({
     [setCollections]
   );
 
+  const handleDuplicateCollection = useCallback(
+    (id: string) => {
+      setCollections((prev) => duplicateCollection(prev, id));
+    },
+    [setCollections]
+  );
+
   const handleDeleteCollection = useCallback(
     (id: string) => {
       const collection = collections.find((c) => c.id === id);
@@ -105,6 +114,13 @@ export function useCollections({
   const handleRenameCollectionNode = useCallback(
     (collectionId: string, nodeId: string, name: string) => {
       setCollections((prev) => renameCollectionNode(prev, collectionId, nodeId, name));
+    },
+    [setCollections]
+  );
+
+  const handleDuplicateCollectionNode = useCallback(
+    (nodeId: string) => {
+      setCollections((prev) => duplicateCollectionNode(prev, nodeId).collections);
     },
     [setCollections]
   );
@@ -191,10 +207,12 @@ export function useCollections({
   return {
     handleAddCollection,
     handleRenameCollection,
+    handleDuplicateCollection,
     handleDeleteCollection,
     handleAddFolder,
     handleAddRequestNode,
     handleRenameCollectionNode,
+    handleDuplicateCollectionNode,
     handleDeleteCollectionNode,
     handleMoveCollectionNode,
     handleImportCollection,

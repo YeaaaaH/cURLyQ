@@ -16,6 +16,7 @@ interface CollectionsProps {
   onAddCollection: () => string;
   onImportCollection: () => void;
   onExportCollection: (id: string) => void;
+  onDuplicateCollection: (id: string) => void;
   onRenameCollection: (id: string, name: string) => void;
   onDeleteCollection: (id: string) => void;
   onRunCollection: (id: string) => void;
@@ -24,6 +25,7 @@ interface CollectionsProps {
   onAddRequestNode: (collectionId: string, parentFolderId: string | null) => string;
   onRunCollectionNode: (collectionId: string, node: CollectionNode) => void;
   onRenameCollectionNode: (collectionId: string, nodeId: string, name: string) => void;
+  onDuplicateCollectionNode: (nodeId: string) => void;
   onDeleteCollectionNode: (collectionId: string, nodeId: string) => void;
   onMoveCollectionNode: (draggedId: string, targetId: string) => void;
   runningId: string | null;
@@ -122,11 +124,13 @@ export const Sidebar = memo(function Sidebar({
             onDeleteCollection={collectionsProps.onDeleteCollection}
             onRunCollection={collectionsProps.onRunCollection}
             onExportCollection={collectionsProps.onExportCollection}
+            onDuplicateCollection={collectionsProps.onDuplicateCollection}
             onOpenRequest={collectionsProps.onOpenCollectionRequest}
             onAddFolder={collectionsProps.onAddFolder}
             onAddRequest={collectionsProps.onAddRequestNode}
             onRunNode={collectionsProps.onRunCollectionNode}
             onRenameNode={collectionsProps.onRenameCollectionNode}
+            onDuplicateNode={collectionsProps.onDuplicateCollectionNode}
             onDeleteNode={collectionsProps.onDeleteCollectionNode}
             onMoveNode={collectionsProps.onMoveCollectionNode}
             runningId={collectionsProps.runningId}
