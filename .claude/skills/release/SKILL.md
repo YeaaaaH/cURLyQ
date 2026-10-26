@@ -60,8 +60,8 @@ match the branch+PR convention without checking with the user first.
    - `git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml src-tauri/Cargo.lock`
      (stage by name, never `-A`/`.`).
    - Commit: subject `Bump version to X.Y.Z`, no body needed for a
-     mechanical version-only change, `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
-     trailer per repo convention.
+     mechanical version-only change, and no `Co-Authored-By`/AI attribution
+     trailer.
    - `git tag vX.Y.Z`
    - `git push && git push origin vX.Y.Z`
 

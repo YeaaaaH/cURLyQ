@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit the current working tree changes onto a feature/bug/task branch, push it, and open a PR into master, following this repo's established git conventions (imperative subject, prose body explaining why, Co-Authored-By trailer, split into logical commits when changes cover unrelated concerns). Direct pushes to master are not used. Use when the user says "commit", "commit and push", or invokes /commit.
+description: Commit the current working tree changes onto a feature/bug/task branch, push it, and open a PR into master, following this repo's established git conventions (imperative subject, prose body explaining why, no AI attribution trailer, split into logical commits when changes cover unrelated concerns). Direct pushes to master are not used. Use when the user says "commit", "commit and push", or invokes /commit.
 ---
 
 # Commit & Push

@@ -12,13 +12,15 @@ cURLyQ is a desktop HTTP client (send HTTP requests with headers/params/body, vi
 - Backend: Rust, exposed to the frontend as Tauri commands (`#[tauri::command]`), invoked via `invoke(...)` from JS/TS.
 - HTTP requests are performed on the Rust side (not from the webview) and returned to the frontend.
 
+Read `docs/architecture.md` before changing the send flow, persisted data shapes, the Rust↔TS contract, or the script sandbox — it covers the request pipeline, where state lives, and the invariants that are easy to break. If a change makes it (or `docs/scripting.md`) inaccurate, update it in the same change.
+
 Scaffolded via `npm create tauri-app` (react-ts template, npm package manager).
 
 - Dev (frontend + Tauri window): `npm run tauri dev`
 - Build release binary: `npm run tauri build`
 - Frontend-only dev server: `npm run dev`
 - Rust check: `cargo check` (run from `src-tauri/`)
-- No test framework set up yet.
+- Rust unit tests: `cargo test` (run from `src-tauri/`). No frontend test framework yet.
 
 ## Workflow
 

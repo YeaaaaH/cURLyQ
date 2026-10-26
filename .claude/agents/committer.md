@@ -57,7 +57,10 @@ than fabricating detail.
    - Blank line, then 1-3 short paragraphs of prose explaining *why* and any
      non-obvious decisions — not a bullet list restating *what* changed,
      since the diff already shows that.
-   - Blank line, then `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`.
+   - No AI attribution: no `Co-Authored-By: Claude ...` trailer, no
+     "Generated with Claude Code" line — in commits or PR bodies. Older
+     commits in `git log` still carry the trailer; that convention is
+     retired, don't copy it.
    - Always pass the message via a heredoc (`git commit -m "$(cat <<'EOF' ... EOF)"`),
      never a raw `-m "..."` string.
 7. Commit each group. Once all commits are made:

@@ -21,7 +21,8 @@ go check.
 Both script editors (and the Body tab's raw JSON editor) support **Ctrl+/**
 (Cmd+/ on Mac) to toggle a `//` line comment on the current line or every
 line touched by the selection — same shortcut as VS Code and most other
-code editors (`src/lib/textEditing.ts`'s `toggleLineComment`).
+code editors (CodeMirror's built-in `toggleComment`, wired up in
+`src/components/codemirror/theme.ts`).
 
 ## Why a sandbox, and what `ctx` is
 
@@ -38,12 +39,17 @@ to the app's DOM, React state, or Tauri APIs. Two reasons:
   timeout can `worker.terminate()` it instead — see `SCRIPT_TIMEOUT_MS` in
   `src/lib/scripting/runScript.ts`.
 
-Each script is called as a plain function body with two parameters:
+Each script is called as a plain function body with three parameters:
 
 ```ts
-const run = new Function("ctx", "console", script);
-run(ctx, sandboxConsole);
+const run = new Function("ctx", "pm", "console", script);
+run(ctx, ctx, sandboxConsole);
 ```
+
+`pm` is a literal alias for `ctx` — the same object under a second name, so
+`pm.environment.set(...)` and `ctx.environment.set(...)` behave identically.
+It exists so Postman-style scripts run as-is; it only covers what `ctx`
+implements (see the table below), not Postman-only surface like `pm.test`.
 
 `ctx` is a plain object built fresh for that one run, containing only the
 pieces of app data listed below (serialized and sent into the Worker via
@@ -61,9 +67,13 @@ kept; there's no history across sends yet.
 | `ctx.environment.toObject()` | pre-request, post-response | Snapshot of every variable as a plain `{key: value}` object — useful for `console.log`-ing or iterating all variables, since `.get`/`.set` alone can't answer "what's in there" (and being functions, they don't show up in a logged `ctx` either — see note below). |
 | `ctx.request.headers.get(key)` | pre-request only | Reads a header on the request about to be sent. |
 | `ctx.request.headers.set(key, value)` | pre-request only | Overrides/adds a header for **this send only** — doesn't edit the saved Headers tab. |
+| `ctx.request.headers.add(...)` / `.upsert(...)` | pre-request only | Postman's method names, same effect as `.set`. Accept either `({key, value})` (the real Postman form) or `(key, value)`. |
 | `ctx.request.body.get()` | pre-request only | Reads the current request body. |
 | `ctx.request.body.set(value)` | pre-request only | Overrides the body for **this send only** — doesn't edit the saved Body tab. |
-| `ctx.response.status` | post-response only | HTTP status code, read-only. |
+| `ctx.request.body.raw` | pre-request only | Getter/setter alias of `.get()`/`.set()` — `pm.request.body.raw = "..."` works like in Postman. |
+| `ctx.request.body.update({ raw })` | pre-request only | Postman-style alias of `.set(raw)`; also accepts a plain string. |
+| `ctx.response.status` | post-response only | HTTP status code (number), read-only. |
+| `ctx.response.code` | post-response only | Same number as `.status` — Postman's name for it (in real Postman, `.status` is the reason phrase like `"OK"`, which cURLyQ doesn't have). |
 | `ctx.response.headers` | post-response only | Response headers as a plain object, read-only. |
 | `ctx.response.body` | post-response only | Raw response body text, read-only. |
 | `ctx.response.json()` | post-response only | Parses `ctx.response.body` as JSON — throws if it isn't valid JSON. |
@@ -140,9 +150,14 @@ Deliberately out of scope for now — see `.tasks/plan.md`:
 
 - `ctx.variables.*` alias, mutating the URL or HTTP method from a script
 - `ctx.sendRequest` (issuing an HTTP call from inside a script)
+- Postman-only APIs: `pm.test`, `pm.expect`, `pm.sendRequest`,
+  `pm.variables` — calling them throws
 - `async`/`await` inside scripts — the script body runs synchronously
-- Postman's own `event`/`exec` script arrays aren't mapped on import/export
-  yet — an imported Postman collection's scripts are dropped
+- **Import** of Postman's `event`/`exec` script arrays — an imported Postman
+  collection's scripts are dropped. **Export** does write them: script text
+  goes through a best-effort `ctx` → `pm` word-boundary rewrite, and the
+  export toast says how many scripts were rewritten so you can double-check
+  them.
 
 ## Where the code lives
 
@@ -152,8 +167,9 @@ Deliberately out of scope for now — see `.tasks/plan.md`:
   timeout, exposes `runPreRequestScript`/`runPostResponseScript`.
 - `src/lib/scripting/types.ts` — the `ScriptRunResult` shape shared between
   the Worker and the UI.
-- `src/hooks/useRequestTabs.ts`'s `handleSend` — wires both scripts into the
-  send flow (environment patch application, request patching, blocking on a
-  pre-request error).
+- `src/lib/requestSend.ts`'s `sendRequestWithScripts` — wires both scripts
+  into the send flow (environment patch application, request patching);
+  `src/hooks/useRequestTabs.ts`'s `handleSend` calls it and pushes each
+  stage's result into the tab's state.
 - `src/components/request-variables-tabs/scripts/` — the Scripts tab UI
   (`ScriptsTab`, `ScriptEditor`, `ScriptLogsPanel`, `ScriptOutputSection`).
