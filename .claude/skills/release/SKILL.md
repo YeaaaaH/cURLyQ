@@ -37,10 +37,11 @@ match the branch+PR convention without checking with the user first.
      bump (computed and shown explicitly, e.g. "0.2.0 → 0.2.1") plus an
      "other" option for a specific version.
 
-2. **Update the version in three files** — `src-tauri/tauri.conf.json`
-   (`version`), `package.json` (`version`), `src-tauri/Cargo.toml`
-   (`[package].version`). Use Edit, not Write, so only the version line
-   changes in each.
+2. **Update the version** in `src-tauri/tauri.conf.json` (`version`) and
+   `src-tauri/Cargo.toml` (`[package].version`) with Edit, so only the
+   version line changes. For `package.json` run
+   `npm version X.Y.Z --no-git-tag-version` instead — it updates
+   `package-lock.json` too, which a hand edit would leave behind.
 
 3. **Sync `Cargo.lock`.** Run `cargo check` from `src-tauri/` — this
    regenerates the local `tauri-app` package entry in `Cargo.lock` to match
@@ -57,7 +58,7 @@ match the branch+PR convention without checking with the user first.
    `/release` was invoked.
 
 6. **Commit, tag, push** (only after confirmation):
-   - `git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml src-tauri/Cargo.lock`
+   - `git add src-tauri/tauri.conf.json package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock`
      (stage by name, never `-A`/`.`).
    - Commit: subject `Bump version to X.Y.Z`, no body needed for a
      mechanical version-only change, and no `Co-Authored-By`/AI attribution

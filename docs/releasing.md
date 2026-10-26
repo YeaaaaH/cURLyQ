@@ -18,8 +18,10 @@ checked out at the tag. To cut a release:
 
 1. Bump `version` in three places, kept in sync manually:
    - `src-tauri/tauri.conf.json` (`version`)
-   - `package.json` (`version`)
-   - `src-tauri/Cargo.toml` (`[package].version`)
+   - `package.json` — via `npm version X.Y.Z --no-git-tag-version`, which
+     also updates `package-lock.json`
+   - `src-tauri/Cargo.toml` (`[package].version`, then `cargo check` to sync
+     `Cargo.lock`)
 2. Commit the bump (e.g. `git commit -am "Bump version to 0.2.0"`).
 3. Tag it and push both: `git tag v0.2.0 && git push && git push --tags`.
 4. Watch the **Actions** tab on GitHub — the `Release` workflow runs four
