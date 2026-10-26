@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { METHOD_COLORS } from "@/lib/http";
+import { METHOD_COLORS, shortMethodLabel } from "@/lib/http";
 import { statusVariant } from "@/lib/requestTabs";
 import type { RunResultTab } from "@/lib/tabs";
 import { ResponseContainer } from "@/components/response-container/ResponseContainer";
@@ -39,7 +39,7 @@ export function RunResultsView({ tab }: RunResultsViewProps) {
                     METHOD_COLORS[step.method]
                   )}
                 >
-                  {step.method}
+                  {shortMethodLabel(step.method)}
                 </span>
                 <span className="min-w-0 shrink-0 basis-48 truncate">{step.requestName}</span>
                 <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{step.url}</span>

@@ -2,7 +2,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, Folder, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HighlightMatch } from "@/components/HighlightMatch";
-import { METHOD_COLORS } from "@/lib/http";
+import { METHOD_COLORS, shortMethodLabel } from "@/lib/http";
 import type { Collection, CollectionNode, FolderNode, RequestNode } from "@/lib/collections";
 import { NodeMenu, QuickAddRequestButton, RenameInput } from "./TreeControls";
 import { BeforeDropZone, EndDropZone, useTreeDragAndDrop } from "./TreeDragAndDrop";
@@ -168,7 +168,7 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
               METHOD_COLORS[node.method]
             )}
           >
-            {node.method}
+            {shortMethodLabel(node.method)}
           </span>
           <RenameInput
             name={node.name}
@@ -191,7 +191,7 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
               METHOD_COLORS[node.method]
             )}
           >
-            {node.method}
+            {shortMethodLabel(node.method)}
           </span>
           <span className="min-w-0 flex-1 truncate" title={node.name}>
             <HighlightMatch text={node.name} query={handlers.query} />
