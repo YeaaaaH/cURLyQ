@@ -1,38 +1,22 @@
 import type { ScriptHalf, ScriptRunResult, ScriptWorkerMessage } from "./types";
 
-// Wall-clock cutoff for a single script run — guards against an infinite
-// loop in user script code hanging Send indefinitely. The worker is
-// terminated (not just abandoned) so it can't keep burning CPU in the
-// background after the timeout fires.
 const SCRIPT_TIMEOUT_MS = 5000;
 
 interface RunScriptParams {
   script: string;
   kind: ScriptHalf;
   environment: Record<string, string>;
-  // Only ever sent for a pre-request run — post-response scripts don't get a
-  // ctx.request (see sandbox.worker.ts's design note).
   request?: { headers: Record<string, string>; body: string };
   response?: { status: number; headers: Record<string, string>; body: string };
 }
 
-// Spins up a fresh worker per run (rather than a reusable one) so each
-// script starts from a genuinely clean global scope, and so terminating a
-// timed-out worker can't accidentally affect a later run. This never
-// rejects — callers always get a ScriptRunResult, timeout/crash included —
-// so handleSend doesn't need a separate error path for "the script itself
-// blew up" vs. "the script ran fine".
+// A fresh worker per run gives each script a clean global scope. Never
+// rejects: a timeout or crash still resolves as a failed ScriptRunResult.
 function runInWorker(params: RunScriptParams): Promise<ScriptRunResult> {
   return new Promise((resolve) => {
     const worker = new Worker(new URL("./sandbox.worker.ts", import.meta.url), { type: "module" });
     let settled = false;
 
-    // Built up incrementally as ScriptWorkerMessages arrive, rather than
-    // read off a single final message — so a timed-out (terminated) worker
-    // still resolves with whatever it managed to do before it hung, instead
-    // of an empty result. `kind: "pre-request"` is implicit in whether any
-    // header/body messages ever arrive at all (only a pre-request run's
-    // ctx.request exists to produce them).
     const logs: string[] = [];
     const environmentPatch: Record<string, string> = {};
     const headersPatch: Record<string, string> = {};

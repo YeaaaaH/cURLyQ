@@ -5,12 +5,6 @@ import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
 import { EnvironmentEditor } from "@/components/EnvironmentEditor";
 
-// The Dialog "popup" chrome (overlay, centering, the "Environments" title,
-// the footer's Export/Delete/Done actions for whichever environment is
-// currently selected, the built-in close button) around EnvironmentEditor,
-// which is just the left-rail-plus-variables content shown inside it — split
-// out so the popup itself has its own name instead of being anonymous JSX
-// inline in TabBar.
 export function EnvironmentsEditorPopup({
   open,
   onOpenChange,

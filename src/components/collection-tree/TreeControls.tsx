@@ -26,15 +26,10 @@ interface RenameInputProps {
   onCancel: () => void;
 }
 
-// Local, auto-focusing rename input — commits on blur or Enter (Enter just
-// blurs, so blur is the single commit path), cancels (reverting to the
-// original name) on Escape. Used for collections, folders, and requests
-// alike since they all rename the same way.
 export function RenameInput({ name, onCommit, onCancel }: RenameInputProps) {
   const [draft, setDraft] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Guards against commit() running twice — e.g. Enter blurs the input,
-  // which would otherwise also fire onBlur's own commit().
+  // Enter blurs the input, which would commit a second time.
   const finishedRef = useRef(false);
 
   useEffect(() => {
@@ -86,9 +81,6 @@ interface QuickAddRequestButtonProps {
   onClick: () => void;
 }
 
-// Sits next to NodeMenu on every container row (collections and folders) as a
-// one-click shortcut for the most common action — skips the "..." dropdown
-// entirely for "New request", which the menu still offers too.
 export function QuickAddRequestButton({ onClick }: QuickAddRequestButtonProps) {
   return (
     <Button
@@ -118,15 +110,8 @@ interface NodeMenuProps {
 }
 
 export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport, onDelete, isRunning }: NodeMenuProps) {
-  // Rename (and "new folder"/"new request", which also starts a rename)
-  // mount a text input the instant an item is clicked — but Radix's
-  // dropdown keeps a trapped focus scope alive for the ~100ms close
-  // animation, and that scope snaps focus straight back to itself the
-  // moment it notices focus land outside it, undoing the input's own
-  // focus a beat after it was set. Radix's own fix for this is to defer
-  // the action to `onCloseAutoFocus`, which fires only once that scope has
-  // fully torn down — so instead of running the action immediately, stash
-  // it and let the menu itself decide when it's safe.
+  // Radix's dropdown pulls focus back during its close animation, stealing it from a
+  // freshly mounted rename input — so the action runs in onCloseAutoFocus instead.
   const pendingActionRef = useRef<(() => void) | null>(null);
 
   function deferUntilClosed(action: () => void) {
@@ -201,10 +186,6 @@ interface DeleteConfirmationDialogProps {
   onCancel: () => void;
 }
 
-// Confirmation gate for a cascading delete — only shown for non-empty
-// folders/collections (see requestDeleteNode/requestDeleteCollection in
-// CollectionTree.tsx), since deleting a lone request or an already-empty
-// container is low-risk and stays instant.
 export function DeleteConfirmationDialog({ pendingDelete, onConfirm, onCancel }: DeleteConfirmationDialogProps) {
   return (
     <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && onCancel()}>

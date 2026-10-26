@@ -2,18 +2,10 @@ import { useCallback, useState } from "react";
 
 const DRAG_THRESHOLD_PX = 48;
 
-// Shared drag-to-open behavior for the left Sidebar and right VariablesPanel
-// edge handles: a short pull past the threshold snaps the panel straight
-// open (not a continuous pixel-by-pixel resize), and pulling back the other
-// way snaps it shut. `side` flips which direction opens vs. closes, since
-// the two panels sit on opposite edges of the window.
+// Snaps open/closed past a threshold rather than resizing continuously.
 export function useEdgeDragPanel(side: "left" | "right") {
   const [open, setOpen] = useState(false);
 
-  // Memoized (only changes identity when `open` itself toggles, not on every
-  // render) so it stays a stable prop for React.memo'd consumers like
-  // Sidebar — see useCollections.ts/useEnvironments.ts for the same
-  // treatment applied to the rest of Sidebar's props.
   const onHandlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -33,15 +25,11 @@ export function useEdgeDragPanel(side: "left" | "right") {
         toggled = true;
       }
     }
-    // Locked on `<body>` for the duration of the drag so it doesn't flicker
-    // back to default the moment the pointer leaves the handle's thin strip
-    // (which happens on essentially every drag — that's the gesture).
+    // Set on <body> so the cursor doesn't flicker once the pointer leaves the thin handle.
     const previousCursor = document.body.style.cursor;
     document.body.style.cursor = "ew-resize";
 
-    // Also ends the drag on pointercancel — without it, an interrupted drag
-    // (e.g. losing focus mid-drag) would leave these document listeners
-    // attached permanently, stacking more of them on every later attempt.
+    // pointercancel too, or an interrupted drag would leak these listeners.
     function handlePointerEnd() {
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("pointerup", handlePointerEnd);

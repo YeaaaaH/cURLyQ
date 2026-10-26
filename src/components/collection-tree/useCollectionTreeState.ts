@@ -11,17 +11,10 @@ function loadExpanded(): Record<string, boolean> {
   }
 }
 
-// Owns the tree's rename and expand/collapse UI state — controlled (rather
-// than each Collapsible's own defaultOpen) so creating something inside a
-// container can force it open to reveal what was just added.
 export function useCollectionTreeState() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>(loadExpanded);
 
-  // Expand state is a UI preference, not shared request data, so it's
-  // persisted to localStorage directly rather than round-tripping through
-  // Rust like collections themselves — same treatment as
-  // activeEnvironmentId in useEnvironments.ts.
   useEffect(() => {
     localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(expandedById));
   }, [expandedById]);
@@ -32,9 +25,6 @@ export function useCollectionTreeState() {
     setExpandedById((current) => (current[id] === open ? current : { ...current, [id]: open }));
   }, []);
 
-  // Sweeps a deleted node (and, for a deleted folder, everything that was
-  // inside it) out of expand state — otherwise stale ids accumulate forever
-  // since nothing else ever removes them.
   const forgetIds = useCallback((ids: readonly string[]) => {
     if (ids.length === 0) return;
     setExpandedById((current) => {

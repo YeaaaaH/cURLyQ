@@ -50,12 +50,7 @@ interface SidebarProps {
   environmentsProps: EnvironmentsProps;
 }
 
-// Memoized since its collections/environments trees can grow large.
-// collectionsProps/environmentsProps each carry callbacks that are
-// individually wrapped in useCallback, then grouped into one memoized object
-// per section (see App.tsx) — the grouping object itself is memoized too, not
-// just its fields, since a fresh object literal per render would defeat this
-// regardless of the callbacks inside it being stable.
+// Memoized: its trees can grow large. Callers keep props stable (see App.tsx).
 export const Sidebar = memo(function Sidebar({
   sidebarOpen,
   onHandlePointerDown,
@@ -65,7 +60,6 @@ export const Sidebar = memo(function Sidebar({
   collectionsProps,
   environmentsProps,
 }: SidebarProps) {
-  // Plain useState, not persisted — search text shouldn't survive a reload.
   const [query, setQuery] = useState("");
 
   const filteredCollections = useMemo(
@@ -86,10 +80,7 @@ export const Sidebar = memo(function Sidebar({
   return (
     <>
       <div
-        // Stays mounted (rather than unmounting) at width: 0 while closed, so
-        // the open transition has something to animate from — `inert` keeps
-        // its buttons/inputs out of the tab order and the a11y tree while
-        // invisible, instead of leaving them silently tabbable at zero width.
+        // Stays mounted at width 0 so it can animate; `inert` keeps it out of tab order.
         inert={!sidebarOpen}
         className={cn(
           "fixed top-8 bottom-0 left-0 z-30 overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-150",

@@ -9,8 +9,6 @@ function loadPersisted<T>(key: string, defaultValue: T): T {
   }
 }
 
-// Generic localStorage-backed state for UI preferences that should survive a
-// reload (theme, section open/closed, etc).
 export function usePersistedState<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(() => loadPersisted(key, defaultValue));
 

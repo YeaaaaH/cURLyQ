@@ -3,24 +3,8 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate
 import { resolveVariable, tokenizeVariables } from "@/lib/variables";
 import { setVariableAwareConfig, variableAwareConfigField } from "@/components/codemirror/variableAwareConfig";
 
-// Colors each {{token}} resolved (blue), circular (amber), or plain
-// unresolved (red) — same three-way split the hover popup and Variables
-// panel already message distinctly. `start`/`end`
-// from tokenizeVariables are already plain string indices, so they drop
-// straight into a decoration range with no translation.
-//
-// A token almost always sits inside a JSON string value (e.g.
-// `"url": "{{host}}"`), which the javascript() language mode also colors.
-// CodeMirror nested our (narrower) mark as the *outer* span around the
-// language highlighter's (wider) string span, not the inner one — so the
-// string span's own color, being set directly on that descendant element,
-// simply isn't reachable by anything set on the ancestor, `!important`
-// included (a descendant's own declared value always wins over an
-// ancestor's, regardless of specificity). What actually fixes it is
-// `Prec.highest` below, which raises this plugin's decorations to the top
-// precedence CodeMirror uses when combining multiple decoration sources —
-// same mechanism @codemirror/search uses so its match-highlighting shows up
-// over syntax-highlighted code.
+// Prec.highest: otherwise our mark nests outside the syntax highlighter's string
+// span, whose own color wins even over !important.
 function buildDecorations(view: EditorView): DecorationSet {
   const { variableContext } = view.state.field(variableAwareConfigField);
   const builder = new RangeSetBuilder<Decoration>();
@@ -32,10 +16,7 @@ function buildDecorations(view: EditorView): DecorationSet {
         : resolution.kind === "circular"
           ? "var(--color-variable-circular)"
           : "var(--color-destructive)";
-    // Both belt (Prec.highest above) and suspenders (!important here): the
-    // precedence bump is what actually fixed the nesting-order case, but
-    // !important is kept too as a cheap guard against the flat-merged-span
-    // case where two decorations land on the very same element.
+    // !important too, for when two decorations merge onto one span.
     builder.add(token.start, token.end, Decoration.mark({ attributes: { style: `color: ${color} !important` } }));
   }
   return builder.finish();

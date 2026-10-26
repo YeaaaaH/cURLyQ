@@ -49,9 +49,6 @@ export function RunResultsView({ tab }: RunResultsViewProps) {
                     {step.response.status}
                   </Badge>
                 ) : (
-                  // Just a compact flag here — the full error text is
-                  // already shown below via ResponseError once expanded, no
-                  // need to repeat it (and blow up the row width) here too.
                   <Badge variant="destructive" className="shrink-0">
                     Error
                   </Badge>
@@ -62,9 +59,6 @@ export function RunResultsView({ tab }: RunResultsViewProps) {
                   <ResponseContainer error={step.error} response={step.response} />
                 </div>
 
-                {/* Collapsed by default when no pre/post-request script ran
-                    for this request (the common case) — auto-opened when one
-                    did, since that's worth seeing right away. */}
                 <Collapsible defaultOpen={scriptsRan} className="flex shrink-0 flex-col gap-2">
                   <CollapsibleTrigger className="group flex w-fit items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
                     <ChevronDown className="size-3 shrink-0 transition-transform group-data-[state=closed]:-rotate-90" />

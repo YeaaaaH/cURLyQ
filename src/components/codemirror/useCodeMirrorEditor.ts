@@ -2,20 +2,8 @@ import { useEffect, useRef } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
-// CodeMirror is an *imperative* library — an EditorView owns its own
-// internal document/selection state, it doesn't re-render from React props
-// the way a <textarea value={...}> would. This hook is what bridges the two
-// worlds: it mounts one EditorView on `containerRef` and keeps it in sync
-// with a normal controlled `value`/`onChange` pair, the same shape every
-// other input in this app already uses.
-//
-// `extensions` is only read on mount — CodeMirror extensions describe
-// *fixed* editor behavior (language, keymap, theme), not per-render props,
-// so there's no need to reconfigure the view when a caller's extensions
-// array is a new identity each render. Anything that genuinely changes over
-// an editor's lifetime (e.g. Body's variable-resolution context, added in a
-// later change) is threaded in via a CodeMirror StateEffect dispatched
-// through `viewRef`, not by recreating extensions.
+// `extensions` is read on mount only; values that change over time go through a
+// StateEffect (see variableAwareConfig.ts).
 export function useCodeMirrorEditor({
   value,
   onChange,
@@ -27,11 +15,7 @@ export function useCodeMirrorEditor({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  // Kept in a ref so the mount effect below doesn't need `onChange` in its
-  // dependency array — this app's callbacks (e.g. useRequestTabs' updaters)
-  // are recreated most renders, and reacting to that would tear down and
-  // rebuild the EditorView (losing undo history/scroll position) for no
-  // reason.
+  // A ref, so a new onChange identity doesn't rebuild the view (losing undo/scroll).
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -54,16 +38,10 @@ export function useCodeMirrorEditor({
       view.destroy();
       viewRef.current = null;
     };
-    // Mount once; see the comment above the hook for why extensions aren't
-    // a dependency here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reconciles an externally-driven `value` change (e.g. switching request
-  // tabs loads a different body) into the view. Guarded by an equality
-  // check so this doesn't also fire — and fight the cursor — every time
-  // `value` changes because of our *own* onChange echoing back through the
-  // parent's state.
+  // Equality guard: our own onChange echoing back must not reset the cursor.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;

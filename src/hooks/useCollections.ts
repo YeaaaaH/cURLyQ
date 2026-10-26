@@ -45,14 +45,12 @@ export function useCollections({
   openCollectionRequestTab,
   onLogEntry,
 }: UseCollectionsParams) {
-  // Restore saved collections, if any, on mount.
   useEffect(() => {
     invoke<Collection[]>("load_collections").then((saved) => {
       if (saved.length > 0) setCollections(saved);
     });
   }, [setCollections]);
 
-  // Debounced autosave, same pattern as environments/tabs.
   useEffect(() => {
     const timeout = setTimeout(() => {
       invoke("save_collections", { collections });
@@ -60,11 +58,7 @@ export function useCollections({
     return () => clearTimeout(timeout);
   }, [collections]);
 
-  // Every handler below is wrapped in useCallback so it stays referentially
-  // stable across unrelated App re-renders (e.g. typing in the active
-  // request's URL/body) — Sidebar is wrapped in React.memo, and any one
-  // prop with a new identity on every render would defeat that regardless
-  // of the rest being stable.
+  // Stable handlers: Sidebar is React.memo'd.
   const handleAddCollection = useCallback((): string => {
     const collection = createCollection("New Collection");
     setCollections((prev) => [...prev, collection]);
@@ -98,10 +92,6 @@ export function useCollections({
     [setCollections]
   );
 
-  // Creating a request always opens it in a new tab immediately, since the
-  // tree row alone has nowhere to edit method/URL/params — same reasoning as
-  // why folders (which have nothing to "open") stay in tree-inline-rename
-  // instead.
   const handleAddRequestNode = useCallback(
     (collectionId: string, parentFolderId: string | null): string => {
       const node = createRequestNode("New Request");

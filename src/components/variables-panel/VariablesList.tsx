@@ -15,9 +15,7 @@ export function VariablesList({ variableNames, variableContext, onUpdateVariable
       ) : (
         variableNames.map((name) => {
           const resolution = resolveVariable(name, variableContext);
-          // Same rule as the hover popup: only editable when the raw
-          // value is a direct literal, so editing here can't silently
-          // flatten a {{nested}} reference into a literal.
+          // Literal values only, same as the hover popup.
           const rawValue = variableContext.lookup(name);
           const isDirectValue = rawValue !== undefined && tokenizeVariables(rawValue).length === 0;
           return (

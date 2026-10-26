@@ -5,11 +5,8 @@ import { cn } from "@/lib/utils";
 
 const appWindow = getCurrentWindow();
 
-// Native decorations are off (see tauri.conf.json) so the whole caption row —
-// drag region, minimize/maximize/close — is drawn here instead, using the
-// same theme tokens as the rest of the app. That's the only way the frame
-// can follow the `terminal` theme's distinct palette/sharp corners, which
-// Tauri's native `setTheme` (light/dark only, OS-drawn chrome) can't do.
+// Native decorations are off (tauri.conf.json) so the frame can follow custom themes;
+// Tauri's setTheme only supports OS-drawn light/dark.
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
 

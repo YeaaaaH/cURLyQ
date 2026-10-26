@@ -7,12 +7,7 @@ import type { KeyValuePair } from "@/lib/keyValue";
 import type { Environment } from "@/lib/environments";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 
-// Local draft state, only committed to the shared `environments` state on
-// explicit confirm (click or Enter) — typing here never touches the
-// app-wide state, so it can't cascade a re-render into the sidebar,
-// environment dropdown, or the rest of this editor on every keystroke.
-// `key={id}` on the call site (not shown here) resets the draft whenever the
-// user switches which environment they're editing.
+// Local draft, committed on confirm, so typing doesn't re-render the sidebar per keystroke.
 function EnvironmentNameField({
   name,
   onConfirm,

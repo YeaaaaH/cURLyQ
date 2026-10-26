@@ -10,13 +10,8 @@ import { setVariableAwareConfig } from "@/components/codemirror/variableAwareCon
 import { variableDecorations } from "@/components/codemirror/variableDecorations";
 import { variableHoverTooltip } from "@/components/codemirror/variableHoverTooltip";
 
-// CodeMirror's own decorations (variableDecorations.ts) and hover tooltip
-// (variableHoverTooltip.tsx) replace what used to be a hand-rolled overlay
-// <div> stacked on top of an invisible <textarea> — see git history for
-// that version if you need the old approach for reference. Body content is
-// JSON-*ish* (getBodyError in requestTabs.ts tolerates `//`/`/* */`
-// comments before parsing), so the JavaScript language mode is used rather
-// than a strict JSON parser that would flag those comments as errors.
+// JavaScript mode, not JSON: bodies may contain `//` and `/* */` comments
+// (stripped before sending), which a JSON parser would flag as errors.
 export function VariableAwareTextarea({
   value,
   onChange,
@@ -49,20 +44,11 @@ export function VariableAwareTextarea({
       javascript(),
       variableDecorations(),
       variableHoverTooltip(),
-      // Strips CodeMirror's default tooltip chrome (white background,
-      // border) — VariableHoverPopupContent already supplies its own
-      // bg-popover/shadow/ring styling, matching the popup used elsewhere.
       EditorView.theme({ ".cm-tooltip": { border: "none", backgroundColor: "transparent" } }),
       ...baseExtensions(placeholder),
     ],
   });
 
-  // Pushes the current environment/variableContext/callbacks into
-  // CodeMirror's own state — see variableAwareConfig.ts for why this can't
-  // just be a closed-over prop. Runs after the view exists (the mount
-  // effect inside useCodeMirrorEditor always runs first — see its own
-  // comment), so the very first paint already has live values, not the
-  // field's no-op defaults.
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: setVariableAwareConfig.of({

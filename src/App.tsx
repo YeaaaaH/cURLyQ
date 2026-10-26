@@ -30,20 +30,13 @@ import { useCollectionRun } from "@/hooks/useCollectionRun";
 
 function App() {
   const [importExportLog, setImportExportLog] = useState<ImportExportLogEntry[]>([]);
-  // Wrapped in useCallback (stable, since setImportExportLog is a React
-  // setState setter and pushLogEntry is a pure import — no other deps) so
-  // this stays a stable prop for useEnvironments/useCollections' handlers,
-  // which are in turn passed down to the React.memo'd Sidebar.
   const onLogEntry = useCallback((entry: Omit<ImportExportLogEntry, "id" | "timestamp">) => {
     setImportExportLog((prev) => pushLogEntry(prev, entry));
   }, []);
 
   const environments = useEnvironments({ onLogEntry });
 
-  // Lives here (rather than inside useCollections) because both useCollections
-  // and useRequestTabs need it: request tabs write into collections (rename,
-  // save-in-place, save-as), and collections need to close tabs for deleted
-  // requests — a genuine two-way dependency between the two domains.
+  // Here, not in useCollections: collections and tabs depend on each other.
   const [collections, setCollections] = useState<Collection[]>([]);
 
   const tabs = useRequestTabs({
@@ -69,39 +62,19 @@ function App() {
     addRunResultTab: tabs.addRunResultTab,
   });
 
-  // Which open tabs have content that isn't actually persisted — url/params/
-  // headers/body/scripts only get written back to a linked collection
-  // request on an explicit Save (unlike name/method, which sync live), so a
-  // tab can look right on screen while what's saved (and what Collection Run
-  // would execute) is stale or, for a never-saved tab, nonexistent.
   const dirtyTabIds = useMemo(
     () => new Set(tabs.requests.filter((r) => isRequestTabDirty(r, collections)).map((r) => r.id)),
     [tabs.requests, collections]
   );
 
-  // A drag-to-open sidebar/variables-panel (rather than a click toggle) for
-  // browsing many environments/collections or a long variables list at once.
-  // Matches Postman's feel: a short pull past a small threshold snaps
-  // straight open, and pulling back the other way snaps it shut.
   const sidebarPanel = useEdgeDragPanel("left");
   const variablesPanel = useEdgeDragPanel("right");
 
-  // Explicit collapse button in the sidebar header, in addition to the
-  // edge-drag handle — stable identity for the memoized Sidebar, same
-  // treatment as the rest of its callback props.
   const onCollapseSidebar = useCallback(() => sidebarPanel.setOpen(false), [sidebarPanel.setOpen]);
 
-  // Keyboard equivalent of the edge handle's drag-to-snap gesture — the
-  // handle isn't a continuous resizer (the sidebar's width is fixed; the
-  // drag only decides open vs. closed past a threshold), so this toggles
-  // rather than resizing.
   const onToggleSidebar = useCallback(() => sidebarPanel.setOpen((open) => !open), [sidebarPanel.setOpen]);
 
-  // Grouped so Sidebar takes one collections-domain prop instead of eleven —
-  // memoized here (not just relying on each field being individually stable)
-  // because an inline object literal would itself be a new identity every
-  // render, which would defeat Sidebar's React.memo just as surely as an
-  // un-memoized callback would.
+  // Memoized as a whole: a fresh object literal would defeat Sidebar's React.memo.
   const collectionsProps = useMemo(
     () => ({
       collections,
@@ -162,9 +135,7 @@ function App() {
     ]
   );
 
-  // A live-resizing window with a docked panel open looks jarring (text
-  // rewrapping, the cURL block reflowing) — simplest is to just close
-  // whichever panel is open rather than trying to animate through it.
+  // Close the docked panel on resize instead of letting its content reflow.
   useEffect(() => {
     function handleWindowResize() {
       sidebarPanel.setOpen(false);
@@ -174,20 +145,11 @@ function App() {
     return () => window.removeEventListener("resize", handleWindowResize);
   }, [sidebarPanel, variablesPanel]);
 
-  // Always resolves to a real tab — `activeId` only ever points at something
-  // currently in `allTabs` (both request and run-result tab close/select
-  // logic keep that invariant).
   const activeTab = tabs.allTabs.find((t) => t.id === tabs.activeId)!;
 
-  // Shared by every variable-aware field (URL, and header/param values) so
-  // each one jumps to the same place instead of each needing its own inline
-  // closure.
   function handleOpenEnvironment() {
     if (environments.activeEnvironmentId) environments.openEnvironmentEditor(environments.activeEnvironmentId);
   }
-  // The hover popup's "Create variable" quick-fix on an unresolved token —
-  // reuses applyEnvironmentPatch's upsert-by-key logic (normally for bulk
-  // script ctx.environment.set results) for a single new, empty-value entry.
   function handleCreateEnvironmentVariable(name: string) {
     environments.applyEnvironmentPatch({ [name]: "" });
   }

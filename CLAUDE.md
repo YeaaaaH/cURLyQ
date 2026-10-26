@@ -26,7 +26,16 @@ Scaffolded via `npm create tauri-app` (react-ts template, npm package manager).
 
 Work step by step, one small piece at a time, with a review checkpoint before moving to the next piece. Do not implement multiple features or large chunks in a single pass unless explicitly asked to.
 
-When introducing a new Rust or JS/TS concept (syntax, pattern, library, tool) for the first time, briefly explain what it is and why it's used here — this project is explicitly for learning, not just shipping.
+When introducing a new Rust or JS/TS concept (syntax, pattern, library, tool) for the first time, briefly explain what it is and why it's used here — this project is explicitly for learning, not just shipping. That explanation goes in the chat reply, not in a code comment.
+
+## Code comments
+
+Code should explain itself through naming and structure. Comment only a non-obvious *why* — a workaround, a library quirk, a constraint the code can't express — in 1–2 lines.
+
+- No history ("previously", "an earlier version", "used to") — git and `.tasks/done.md` have it.
+- No restating what the code or a function name already says.
+- No flow/architecture descriptions — those live in `docs/architecture.md`.
+- Existing long comments are not a style to match.
 
 ## Git workflow
 

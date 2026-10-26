@@ -10,16 +10,13 @@ export function buildRequestUrl(rawUrl: string, params: KeyValuePair[]): string 
   return url.toString();
 }
 
-// Only escapes characters that would otherwise break the query string's
-// structure (&, =, #) — everything else, including non-ASCII text, is left
-// readable. url.toString() would percent-encode all of it, which is correct
-// for the wire format but unreadable while editing.
+// Escapes only &, =, # — url.toString() would percent-encode everything,
+// which is unreadable while editing.
 export function escapeForDisplay(value: string): string {
   return value.replace(/[&=#]/g, (ch) => encodeURIComponent(ch));
 }
 
-// Plain string splicing rather than the URL API, so this also works for
-// template URLs like {{baseUrl}}/path that aren't parseable as absolute URLs.
+// String splicing, not the URL API: {{baseUrl}}/path isn't a parseable URL.
 export function buildDisplayUrl(rawUrl: string, params: KeyValuePair[]): string {
   const hashIndex = rawUrl.indexOf("#");
   const hash = hashIndex === -1 ? "" : rawUrl.slice(hashIndex);
@@ -37,14 +34,8 @@ export function syncUrlWithParams(rawUrl: string, params: KeyValuePair[]): strin
   return buildDisplayUrl(rawUrl, params);
 }
 
-// Postman's own request-detail UI (address bar, Params tab, and apparently
-// whatever else shares that render path) is driven by the url object's
-// parsed `host`/`path`/`query`, not `raw` — `raw` is redundant/duplicate
-// info Postman keeps in sync with those, not a fallback source of truth. An
-// exported `{ raw }`-only url object renders as blank in real Postman even
-// though the text is right there. String splicing rather than the URL API,
-// same reasoning as buildDisplayUrl: `{{baseUrl}}/path` isn't a parseable
-// absolute URL, but still needs a host/path split.
+// Postman renders from the parsed host/path/query, not `raw` — a raw-only
+// url object shows up blank there.
 export function buildPostmanUrlObject(
   rawUrl: string,
   params: KeyValuePair[]
@@ -62,9 +53,6 @@ export function buildPostmanUrlObject(
   const hostPart = slashIndex === -1 ? afterProtocol : afterProtocol.slice(0, slashIndex);
   const pathPart = slashIndex === -1 ? "" : afterProtocol.slice(slashIndex + 1);
 
-  // A bare `{{baseUrl}}` host has no literal dots, so splitting on "." still
-  // yields the single-element array Postman's own exports use for a
-  // variable-only host — this doesn't need a special case.
   const host = hostPart === "" ? [] : hostPart.split(".");
   const path = pathPart === "" ? [] : pathPart.split("/").filter((segment) => segment !== "");
   const query = params
@@ -84,9 +72,6 @@ export function unescapeFromDisplay(value: string): string {
   return value.replace(/%23|%26|%3d/gi, (seq) => decodeURIComponent(seq));
 }
 
-// Reverse of buildDisplayUrl — also plain string splicing rather than the URL
-// API, so typing/pasting a template URL like {{baseUrl}}/path?x=1 (which
-// isn't parseable as an absolute URL) still keeps the Params tab in sync.
 export function parseParamsFromUrl(rawUrl: string): KeyValuePair[] {
   const hashIndex = rawUrl.indexOf("#");
   const withoutHash = hashIndex === -1 ? rawUrl : rawUrl.slice(0, hashIndex);

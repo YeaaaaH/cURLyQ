@@ -6,15 +6,11 @@ use tauri::Manager;
 #[serde(rename_all = "camelCase")]
 struct HttpResponse {
     status: u16,
-    // A tuple vec (not HashMap<String, String>) so repeated header names —
-    // e.g. multiple Set-Cookie values — survive instead of the later one
-    // silently overwriting the earlier ones.
+    // Tuples, not a HashMap, so repeated headers (Set-Cookie) survive.
     headers: Vec<(String, String)>,
     body: String,
     time_ms: u128,
-    // Body size only (not a "wire size" including headers/status line) —
-    // matches what `body` actually holds, since reqwest already decodes any
-    // Content-Encoding before we see it.
+    // Decoded body size; reqwest has already undone any Content-Encoding.
     size_bytes: usize,
 }
 
@@ -44,17 +40,13 @@ struct PersistedTab {
     headers: Vec<KeyValuePair>,
     body: String,
     active_sub_tab: String,
-    // Absent in tabs.json files saved before pre-request/post-response
-    // scripts existed — defaulted the same way source_request_id below is,
-    // for the same reason (older files shouldn't fail to parse).
+    // serde(default) on fields added later, so older files still load.
     #[serde(default)]
     pre_request_script: String,
     #[serde(default)]
     post_response_script: String,
     #[serde(default = "default_script_tab")]
     active_script_tab: String,
-    // Absent in tabs.json files saved before Collections existed —
-    // `#[serde(default)]` reads those as None instead of failing to parse.
     #[serde(default)]
     source_request_id: Option<String>,
     #[serde(default)]
@@ -72,9 +64,6 @@ struct PersistedTabsFile {
     tabs: Vec<PersistedTab>,
 }
 
-// Mirrors the frontend's CollectionNode discriminated union: `type` tags which
-// variant a node is, so a folder can contain more folders or requests nested
-// arbitrarily deep.
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 enum CollectionNode {
@@ -91,15 +80,8 @@ enum CollectionNode {
         params: Vec<KeyValuePair>,
         headers: Vec<KeyValuePair>,
         body: String,
-        // Absent in collections.json files saved before scripts existed —
-        // defaulted for the same reason as PersistedTab's script fields above.
-        // Explicit camelCase `rename` (not `rename_all` on the enum, which
-        // only affects the `type` tag's variant names, not field names
-        // within a variant) — without it, this silently round-trips as
-        // `pre_request_script`/`post_response_script` over the IPC
-        // boundary, which the frontend's camelCase `RequestNode` never
-        // matches: every save quietly resets scripts to empty, and every
-        // load leaves them `undefined`.
+        // Explicit rename: `rename_all` on the enum only renames the `type` tag, and a
+        // snake_case field silently resets to empty on the camelCase frontend.
         #[serde(default, rename = "preRequestScript")]
         pre_request_script: String,
         #[serde(default, rename = "postResponseScript")]
@@ -133,11 +115,7 @@ async fn send_request(
     if let Some(body) = body {
         request = request.body(body);
     }
-    // reqwest's own error classification (is_connect/is_timeout) is far more
-    // reliable than pattern-matching the message text, which varies by OS
-    // (e.g. "Connection refused (os error 10061)" on Windows vs. "(os error
-    // 111)" on Linux). The technical detail stays appended for debugging —
-    // just with a plain-language headline in front of it.
+    // Classify via reqwest rather than message text, which differs per OS.
     let start = std::time::Instant::now();
     let response = request.send().await.map_err(|e| {
         if e.is_connect() {
@@ -161,10 +139,7 @@ async fn send_request(
         })
         .collect::<Vec<_>>();
     let body = response.text().await.map_err(|e| e.to_string())?;
-    // Measured through body-read completion, not just the initial response —
-    // for a streamed/chunked body, `.send()` alone returns once headers
-    // arrive, well before the transfer (and the time a user actually waits)
-    // is done.
+    // Measured after the body is read: for a chunked body, send() returns at headers.
     let time_ms = start.elapsed().as_millis();
     let size_bytes = body.len();
 
@@ -177,10 +152,6 @@ async fn send_request(
     })
 }
 
-// Resolves a filename to a path inside the app's data directory, creating
-// that directory if it doesn't exist yet — shared by every persisted-JSON
-// file below (tabs/environments/collections), which otherwise differed only
-// by filename and the type being (de)serialized.
 fn data_file_path(app: &tauri::AppHandle, filename: &str) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -193,9 +164,7 @@ fn save_json<T: Serialize>(app: &tauri::AppHandle, filename: &str, data: &T) -> 
     std::fs::write(path, json).map_err(|e| e.to_string())
 }
 
-// Returns `T::default()` (an empty Vec, or an empty PersistedTabsFile) when
-// the file hasn't been written yet, rather than treating a first run as an
-// error.
+// A missing file (first run) loads as empty, not an error.
 fn load_json<T: DeserializeOwned + Default>(
     app: &tauri::AppHandle,
     filename: &str,
@@ -243,11 +212,7 @@ fn load_environments(app: tauri::AppHandle) -> Result<Vec<Environment>, String> 
 mod collection_node_tests {
     use super::*;
 
-    // The frontend's CollectionNode is a discriminated union on a `type`
-    // field with literal "folder"/"request" tags. This pins down that the
-    // `#[serde(tag = "type", rename_all = "lowercase")]` attribute actually
-    // produces that exact shape, since a mismatch here wouldn't be caught by
-    // the compiler on either side of the IPC boundary.
+    // The serialized shape is the IPC contract with the TS types; nothing else checks it.
     #[test]
     fn serializes_with_lowercase_type_tag() {
         let folder = CollectionNode::Folder {
@@ -270,10 +235,6 @@ mod collection_node_tests {
         assert_eq!(json["type"], "folder");
         assert_eq!(json["items"][0]["type"], "request");
         assert_eq!(json["items"][0]["method"], "GET");
-        // Pins the camelCase field names the frontend's `RequestNode` type
-        // actually expects — this exact mismatch (fields round-tripping as
-        // `pre_request_script`/`post_response_script` instead) silently
-        // dropped every saved script and left every loaded one `undefined`.
         assert_eq!(json["items"][0]["preRequestScript"], "console.log('pre')");
         assert_eq!(
             json["items"][0]["postResponseScript"],
@@ -310,15 +271,11 @@ fn load_collections(app: tauri::AppHandle) -> Result<Vec<Collection>, String> {
     load_json(&app, "collections.json")
 }
 
-// Reads an arbitrary file the user picked via the native open dialog (import
-// flow) — unlike the app-data-dir helpers above, `path` isn't ours to choose,
-// it comes straight from the OS file picker the user just interacted with.
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
-// Writes to a path the user chose via the native save dialog (export flow).
 #[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(path, contents).map_err(|e| e.to_string())
@@ -326,11 +283,7 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Built once and reused across every `send_request` call via Tauri's
-    // managed state, instead of a fresh `reqwest::Client` per request — a new
-    // client would throw away connection pooling and redo TLS setup every
-    // single send. The 30s timeout also gives a hung server a firm cutoff
-    // instead of leaving the request pending indefinitely.
+    // One shared client keeps connection pooling and TLS sessions across sends.
     let http_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()

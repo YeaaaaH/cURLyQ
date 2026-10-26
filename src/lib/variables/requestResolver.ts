@@ -11,12 +11,7 @@ export interface OutgoingRequest {
   body: string | null;
 }
 
-// Everything actually sent over the wire for `request` — variables
-// substituted, params merged into the URL's query string, and the same
-// default-header rules (Content-Type if there's a body and none was set,
-// User-Agent if none was set) applied. Factored out so the "Variables in
-// request" panel's cURL preview shows exactly what would go out, rather than
-// a second computation that could quietly drift from it.
+// Also used by the cURL preview, so the preview is exactly what gets sent.
 export function resolveRequest(
   request: Pick<RequestTab, "method" | "url" | "params" | "headers" | "body">,
   context: VariableLookup
@@ -30,9 +25,7 @@ export function resolveRequest(
       params.map((p) => ({ ...p, value: substituteVariables(p.value, context) }))
     );
   } catch {
-    // Not a valid absolute URL yet (mid-edit, or a template that hasn't
-    // resolved) — fall back to the substituted raw string so the preview
-    // still shows something close, instead of throwing during a render.
+    // Not a valid URL yet (mid-edit or unresolved template) — don't throw during render.
     requestUrl = substituteVariables(url, context);
   }
 

@@ -24,10 +24,6 @@ export function createEmptyScriptRun(): LastScriptRun {
   return { pre: null, post: null };
 }
 
-// The Scripts tab's own internal switcher has one more option than
-// `ScriptHalf` (which only names the two *execution* kinds) — a third
-// "logs" view with no script text of its own, just this tab's last run
-// results for both halves at once.
 export type ScriptsSubTab = ScriptHalf | "logs";
 
 export interface RequestTab {
@@ -43,17 +39,12 @@ export interface RequestTab {
   preRequestScript: string;
   postResponseScript: string;
   activeScriptTab: ScriptsSubTab;
-  // Output of the last time this tab's scripts ran (console logs/errors) —
-  // never persisted, same as response/error/isSending below: it describes
-  // the last send, not saved request state.
+  // Not persisted, like response/error/isSending.
   lastScriptRun: LastScriptRun;
   response: HttpResponse | null;
   error: string | null;
   isSending: boolean;
-  // Set when this tab was opened from (or last saved to) a request node in a
-  // Collection — lets "Save" update that node in place instead of always
-  // opening a "Save to..." picker. Both null for a tab that was never linked
-  // to a collection.
+  // Null when the tab was never linked to a collection request.
   sourceRequestId: string | null;
   sourceCollectionId: string | null;
 }
@@ -81,8 +72,6 @@ export function createRequestTab(): RequestTab {
   };
 }
 
-// The on-disk shape: everything in RequestTab except the transient,
-// never-persisted fields (response, error, isSending).
 export interface PersistedTab {
   id: string;
   name: string;
@@ -99,8 +88,6 @@ export interface PersistedTab {
   sourceCollectionId: string | null;
 }
 
-// tabs.json's top-level shape: which tab was last active is stored once here
-// (not per-tab), alongside the tab list itself.
 export interface PersistedTabsFile {
   activeTabId: string | null;
   tabs: PersistedTab[];
@@ -182,14 +169,7 @@ export function getUrlError(url: string, context: VariableLookup): string | null
   if (trimmed === "") return null;
   const substituted = substituteVariables(trimmed, context);
 
-  // A template URL (e.g. {{baseUrl}}/path, or even just http://{{host}}/path)
-  // may still contain an unresolved {{var}} if no environment is active or
-  // the variable isn't defined there — `new URL()` throws on the literal
-  // `{`/`}` characters even though the URL is perfectly valid once resolved.
-  // Fall back to a plain prefix check instead of full parsing in that case.
-  // (Variable names aren't limited to \w — see tokenizer.ts's
-  // VARIABLE_PATTERN; matched here without the `g` flag since this is a
-  // one-shot `.test()`, not an iteration.)
+  // new URL() throws on an unresolved {{var}}, so fall back to a prefix check.
   if (/\{\{\s*[\w.-]+\s*\}\}/.test(substituted)) {
     return /^https?:\/\//i.test(substituted) ? null : "URL must start with http:// or https://";
   }
@@ -206,12 +186,7 @@ export function getUrlError(url: string, context: VariableLookup): string | null
   return null;
 }
 
-// Strips Postman-style `//` and `/* */` comments from a JSON body before
-// parsing/sending — plain JSON doesn't allow comments, but Postman's own raw
-// body editor tolerates them for documentation, so requests built elsewhere
-// (or just typed by hand, matching Postman muscle memory) shouldn't break
-// here. String-aware so a "//" or "/*" inside an actual string value (e.g. a
-// URL) is left alone rather than treated as the start of a comment.
+// String-aware: a // or /* inside a string value (e.g. a URL) is kept.
 export function stripJsonComments(text: string): string {
   let result = "";
   let inString = false;
@@ -258,18 +233,9 @@ export function stripJsonComments(text: string): string {
 
 export function getBodyError(body: string, context: VariableLookup): string | null {
   const withoutComments = stripJsonComments(body);
-  // Checked after stripping comments (not on the raw `body`) so a body
-  // that's entirely commented out — e.g. a whole example JSON block toggled
-  // off with Ctrl+/ — counts as empty too, instead of failing to parse the
-  // leftover blank string.
+  // Checked after stripping, so a fully commented-out body counts as empty.
   if (withoutComments.trim() === "") return null;
-  // Resolve whatever the current context can (so e.g. {{port}} used
-  // unquoted for a numeric value validates correctly once it substitutes to
-  // real digits), then treat anything still unresolved — no active
-  // environment, or the variable isn't defined there — as an opaque
-  // placeholder for validation purposes only. Postman itself doesn't block
-  // editing/sending over a {{var}} that hasn't resolved yet; it'll either
-  // resolve by send time or the server will complain, not the editor.
+  // Unresolved {{vars}} become `null` so they don't fail JSON validation.
   const withPlaceholders = substituteVariables(withoutComments, context).replace(VARIABLE_PATTERN, "null");
   try {
     JSON.parse(withPlaceholders);
@@ -288,14 +254,7 @@ function sameRows(a: KeyValuePair[], b: KeyValuePair[]): boolean {
   );
 }
 
-// Whether `tab`'s content differs from what's actually persisted — the URL,
-// params, headers, body, and scripts only ever get written back to a linked
-// collection request on an explicit Save (unlike name/method, which sync
-// live on every change), so a tab can look correct on screen while what
-// Collection Run would actually execute is stale or, for a never-saved tab,
-// nonexistent. Compares against a blank baseline when there's no linked
-// (or no longer findable) saved request, so a fresh tab with typed-in
-// content that was never saved anywhere also counts as dirty.
+// A tab with no linked (or a deleted) saved request is compared against a blank one.
 export function isRequestTabDirty(tab: RequestTab, collections: Collection[]): boolean {
   const savedNode =
     tab.sourceCollectionId && tab.sourceRequestId

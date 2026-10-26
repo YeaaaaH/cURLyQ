@@ -15,10 +15,6 @@ export function createEnvironment(name: string): Environment {
   };
 }
 
-// New environments are named after world capitals rather than "Environment
-// N" — picking the first one not already in use also sidesteps the old
-// collision bug where a count-based number (existing.length + 1) drifted out
-// of sync once something in the middle of the list got deleted.
 const CAPITAL_NAMES = [
   "Amsterdam", "Ankara", "Athens", "Baghdad", "Bangkok", "Beijing", "Berlin", "Bogota",
   "Brasilia", "Brussels", "Bucharest", "Budapest", "Buenos Aires", "Cairo", "Canberra",
@@ -29,8 +25,6 @@ const CAPITAL_NAMES = [
   "Stockholm", "Tallinn", "Tokyo", "Vienna", "Warsaw", "Wellington", "Zagreb",
 ];
 
-// Keeps only environments whose name matches `query` (case-insensitive). A
-// blank query returns `environments` unchanged.
 export function filterEnvironments(environments: readonly Environment[], query: string): Environment[] {
   const trimmed = query.trim().toLowerCase();
   if (trimmed === "") return environments as Environment[];
@@ -41,9 +35,6 @@ export function nextEnvironmentName(existing: Environment[]): string {
   const usedNames = new Set(existing.map((e) => e.name));
   const capital = CAPITAL_NAMES.find((name) => !usedNames.has(name));
   if (capital) return capital;
-  // Every capital in the list is already taken — cycle through the list
-  // again with an incrementing suffix ("London 2", "Paris 2", ...) rather
-  // than switching to a differently-themed fallback name.
   for (let iteration = 2; ; iteration++) {
     const capitalForIteration = CAPITAL_NAMES.find(
       (name) => !usedNames.has(`${name} ${iteration}`)
@@ -52,10 +43,6 @@ export function nextEnvironmentName(existing: Environment[]): string {
   }
 }
 
-// Reverse of parsePostmanEnvironment below — the exported file only needs to
-// be re-importable (by us or real Postman), not byte-identical to whatever
-// was originally imported, so this doesn't try to round-trip an `id` or any
-// `_postman_*` metadata we never kept in the first place.
 export function buildPostmanEnvironment(environment: Environment) {
   return {
     id: environment.id,
@@ -77,9 +64,6 @@ interface PostmanEnvironmentValue {
   enabled?: unknown;
 }
 
-// Maps a parsed Postman v2.1 environment export into our Environment shape.
-// Throws PostmanImportError (with a user-facing message) if `json` doesn't
-// look like a Postman environment at all.
 export function parsePostmanEnvironment(json: unknown, existing: Environment[]): Environment {
   if (typeof json !== "object" || json === null) {
     throw new PostmanImportError("Not a valid JSON file.");

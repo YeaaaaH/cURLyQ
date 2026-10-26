@@ -24,12 +24,7 @@ const PLACEHOLDERS: Record<ScriptHalf, string> = {
   "post-response": `pm.environment.set("token", pm.response.json().token);`,
 };
 
-// Quick-insert buttons use `pm.`-prefixed, Postman-shaped calls (not just
-// the identifier — `.upsert`/`.raw` too, see sandbox.worker.ts) so a script
-// built entirely from these buttons is portable to real Postman by default,
-// not just re-importable into cURLyQ. `ctx.*`/`.set()` still work identically
-// (see sandbox.worker.ts's aliases) for anyone typing by hand who doesn't
-// care about portability — this only changes what the buttons insert.
+// Snippets use Postman's call shapes so button-built scripts export as-is.
 const SNIPPETS: Record<ScriptHalf, ScriptSnippet[]> = {
   "pre-request": [
     { label: "environment.get", insert: 'pm.environment.get("key")' },

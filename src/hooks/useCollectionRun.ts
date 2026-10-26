@@ -20,9 +20,6 @@ export function useCollectionRun({
   applyEnvironmentPatch,
   addRunResultTab,
 }: UseCollectionRunParams) {
-  // Which collection/folder node is currently running, so the tree can show
-  // a spinner on that row instead of leaving the Run action's completion
-  // invisible until the result tab appears.
   const [runningId, setRunningId] = useState<string | null>(null);
 
   const runAndReport = useCallback(

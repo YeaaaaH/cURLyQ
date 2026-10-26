@@ -16,17 +16,12 @@ interface ScriptEditorProps {
 }
 
 export function ScriptEditor({ value, onChange, placeholder, snippets }: ScriptEditorProps) {
-  // Only read on mount — see useCodeMirrorEditor's comment on why the
-  // extensions array isn't reactive to re-renders.
   const { containerRef, viewRef } = useCodeMirrorEditor({
     value,
     onChange,
     extensions: [javascript(), ...baseExtensions(placeholder)],
   });
 
-  // Replaces the current selection (an empty one, most of the time — just
-  // the cursor) with the snippet text, then leaves the cursor right after
-  // it, same as typing it would.
   function insertSnippet(text: string) {
     const view = viewRef.current;
     if (!view) return;

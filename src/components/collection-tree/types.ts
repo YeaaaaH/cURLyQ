@@ -5,8 +5,6 @@ export type SetExpanded = (id: string, expanded: boolean) => void;
 export type RenameNode = (collectionId: string, nodeId: string, name: string) => void;
 export type OpenRequest = (collectionId: string, node: RequestNode) => void;
 
-// Bag of callbacks + UI state threaded down through every row in the tree —
-// shared by CollectionRow, NodeRow, FolderRow, and RequestRow.
 export interface TreeHandlers {
   query: string;
   renamingId: string | null;
@@ -24,11 +22,7 @@ export interface TreeHandlers {
   runningId: string | null;
 }
 
-// Explicit, serializable delete-confirmation state — avoids storing a
-// closure (and its captured props/variables) directly in React state.
-// idsToForget is every id in the subtree being deleted (itself included),
-// computed up front so confirmDelete can sweep expand state without needing
-// the original node/collection object back.
+// Plain data rather than a stored closure, so confirming can't act on stale props.
 export type PendingDelete =
   | { type: "collection"; collectionId: string; title: string; description: string; idsToForget: string[] }
   | { type: "node"; collectionId: string; nodeId: string; title: string; description: string; idsToForget: string[] };

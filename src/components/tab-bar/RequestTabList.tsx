@@ -10,8 +10,6 @@ interface RequestTabItemProps {
   dirty: boolean;
   onSelect: () => void;
   onClose: () => void;
-  // React 19 lets a function component accept `ref` as a plain prop —
-  // no forwardRef wrapper needed.
   ref?: React.Ref<HTMLDivElement>;
 }
 
@@ -73,13 +71,7 @@ interface RequestTabListProps {
 }
 
 export function RequestTabList({ tabs, activeId, dirtyTabIds, onSelectTab, onCloseTab }: RequestTabListProps) {
-  // The tab strip scrolls horizontally once there are more tabs than fit —
-  // switching the active tab programmatically (e.g. clicking a request in
-  // the collection tree that's already open) previously left it selected but
-  // scrolled out of view, with no indication anything changed. `block:
-  // "nearest"`/`inline: "nearest"` keeps this to the strip's own horizontal
-  // scroll, since <main>'s ancestors are all overflow-hidden/fixed and can't
-  // scroll anyway.
+  // Keeps a programmatically activated tab scrolled into view.
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
   useEffect(() => {
     tabRefs.current.get(activeId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -90,8 +82,6 @@ export function RequestTabList({ tabs, activeId, dirtyTabIds, onSelectTab, onClo
     else tabRefs.current.delete(id);
   }
 
-  // The strip is wider than it is tall and has no vertical scroll of its
-  // own, so a vertical wheel gesture scrolls it horizontally instead.
   function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
     if (e.deltaY === 0) return;
     e.currentTarget.scrollLeft += e.deltaY;

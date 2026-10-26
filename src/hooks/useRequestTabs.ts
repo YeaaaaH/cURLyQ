@@ -45,39 +45,19 @@ export function useRequestTabs({
   const [requests, setRequests] = useState<RequestTab[]>(() => [createRequestTab()]);
   const [activeId, setActiveId] = useState(() => requests[0].id);
 
-  // Run results (Collection Run) open in the same strip as request tabs but
-  // are never persisted — a run result is a snapshot of a past action, not
-  // an editable document. Kept as a separate array rather than merged into
-  // `requests` itself, so `requests`/`setRequests` stay exactly RequestTab[]
-  // everywhere else in this hook; `allTabs` below is the merged view the tab
-  // strip actually renders.
+  // Never persisted, so kept apart from `requests`.
   const [runResultTabs, setRunResultTabs] = useState<RunResultTab[]>([]);
   const allTabs = useMemo<Tab[]>(() => [...requests, ...runResultTabs], [requests, runResultTabs]);
 
-  // Falls back to the first request tab when `activeId` currently points at
-  // a run-result tab — every computation below (urlError, curlCommand,
-  // handleSend, etc.) needs *some* real RequestTab to operate on even though
-  // its result won't be shown while a run-result tab is what's displayed
-  // (App.tsx only renders the request-editing UI when the active tab's type
-  // is "request").
+  // While a run-result tab is active, values derived from this aren't shown.
   const activeRequest = requests.find((r) => r.id === activeId) ?? requests[0];
 
-  // Mirrors `requests` for the handlers below that need the *current* tab
-  // list but are also passed down to a `React.memo`'d Sidebar
-  // (`closeTabsForRequestIds`, `openCollectionRequestTab`,
-  // `handleOpenCollectionRequest`) — `requests` changes on every keystroke
-  // in the active tab's URL/body/params/headers, so taking it as a
-  // `useCallback` dependency would give those handlers a new identity every
-  // keystroke too, defeating Sidebar's memoization entirely. Reading
-  // `requestsRef.current` instead means they can stay referentially stable
-  // while still seeing up-to-date tab data.
+  // Lets memoized handlers read current tabs without changing identity per keystroke.
   const requestsRef = useRef(requests);
   useEffect(() => {
     requestsRef.current = requests;
   }, [requests]);
 
-  // Restore tabs left open from the previous session, if any were saved,
-  // including which tab and which sub-tab were last active.
   useEffect(() => {
     invoke<PersistedTabsFile>("load_tabs").then((saved) => {
       if (saved.tabs.length === 0) return;
@@ -90,8 +70,6 @@ export function useRequestTabs({
     });
   }, []);
 
-  // Quietly keep disk in sync with whatever's currently open, debounced so a
-  // burst of keystrokes doesn't trigger a write per character.
   useEffect(() => {
     const timeout = setTimeout(() => {
       invoke("save_tabs", { activeTabId: activeId, tabs: requests.map(toPersistedTab) });
@@ -103,14 +81,6 @@ export function useRequestTabs({
     setRequests((prev) => prev.map((r) => (r.id === activeId ? { ...r, ...patch } : r)));
   }
 
-  // Closes every open tab whose sourceRequestId is in `deletedIds` (a request
-  // being deleted directly, or every request that was nested inside a deleted
-  // folder/collection) — an open tab shouldn't keep pointing at a request that
-  // no longer exists. Falls back to a fresh blank tab if that closes the last
-  // one, or to the first remaining tab if the active tab specifically was
-  // among those closed. Reads `requestsRef`/`setActiveId`'s functional form
-  // (not `requests`/`activeId` directly) so this stays referentially stable
-  // — see the `requestsRef` comment above.
   const closeTabsForRequestIds = useCallback((deletedIds: Set<string>) => {
     if (deletedIds.size === 0) return;
     const current = requestsRef.current;
@@ -153,8 +123,6 @@ export function useRequestTabs({
     setActiveId(tab.id);
   }, []);
 
-  // Opening the same saved request twice focuses the existing tab instead of
-  // piling up duplicates.
   const handleOpenCollectionRequest = useCallback(
     (collectionId: string, node: RequestNode) => {
       const existingTab = requestsRef.current.find((r) => r.sourceRequestId === node.id);
@@ -167,11 +135,7 @@ export function useRequestTabs({
     [openCollectionRequestTab]
   );
 
-  // Renaming a tab that was opened from (or saved to) a collection request
-  // keeps the two names in sync — deliberately only on blur (not every
-  // keystroke) so typing a name doesn't re-render the whole collection tree
-  // per character, the same lag bug fixed for environment renaming (see
-  // ui-polish PLAN.md Item 3).
+  // On blur only, so typing doesn't re-render the collection tree per keystroke.
   function handleCommitRequestName() {
     const finalName = activeRequest.name.trim() === "" ? "Untitled request" : activeRequest.name;
     updateActiveRequest({ name: finalName });
@@ -182,9 +146,6 @@ export function useRequestTabs({
     }
   }
 
-  // Same live-sync shortcut as the name above, for method — a Select's
-  // onValueChange is already a single discrete pick (not a keystroke stream),
-  // so there's no lag risk here that would call for a blur-only debounce.
   function handleUpdateMethod(method: string) {
     updateActiveRequest({ method });
     if (activeRequest.sourceRequestId && activeRequest.sourceCollectionId) {
@@ -194,11 +155,6 @@ export function useRequestTabs({
     }
   }
 
-  // Persists the active tab's current field values into the collection
-  // request it's already linked to. Only meaningful when a source exists —
-  // RequestEditor decides whether to call this or open the "Save to..."
-  // picker instead (a fresh, never-saved tab has nowhere to save *to* yet),
-  // since it already owns that picker's state.
   function handleSaveActiveRequestInPlace() {
     setCollections((prev) =>
       updateCollectionRequestFields(prev, activeRequest.sourceCollectionId!, activeRequest.sourceRequestId!, {
@@ -215,10 +171,7 @@ export function useRequestTabs({
     toast.success(`Saved "${activeRequest.name}"`);
   }
 
-  // Confirming the "Save to..." picker always creates a brand-new request
-  // node (even for "Save as" on an already-linked tab, which is exactly the
-  // fork behavior that action is for) and re-points the active tab at it, so
-  // the tab that's open keeps editing whatever it was just saved as.
+  // Always creates a new node, even for "Save as" on a linked tab.
   function handleConfirmSaveTo(collectionId: string, parentFolderId: string | null, name: string) {
     const node: RequestNode = {
       type: "request",
@@ -244,9 +197,6 @@ export function useRequestTabs({
   }
 
   function handleCloseTab(id: string) {
-    // Run-result tabs live in a separate array (see `runResultTabs` above) —
-    // closing one never needs the "keep at least one" fallback a request
-    // tab does, since there's always at least one request tab regardless.
     if (runResultTabs.some((r) => r.id === id)) {
       const remaining = runResultTabs.filter((r) => r.id !== id);
       setRunResultTabs(remaining);
@@ -273,9 +223,6 @@ export function useRequestTabs({
     }
   }
 
-  // Opens a finished Collection Run's results as a new tab, focused
-  // immediately — same "just landed, look at it now" behavior as opening a
-  // saved request.
   const addRunResultTab = useCallback((label: string, result: CollectionRunResult) => {
     const tab = createRunResultTab(label, result);
     setRunResultTabs((prev) => [...prev, tab]);
@@ -378,14 +325,7 @@ export function useRequestTabs({
     return buildCurlCommand(method, url, headers, body);
   }, [activeRequest, variableContext]);
 
-  // Guards against a double-send on the same tab: the Send button already
-  // disables while `isSending` is true, but that's React state, which only
-  // takes effect on the next render. A double-click (or Enter fired twice in
-  // quick succession) can call handleSend a second time before that render
-  // happens, both invocations still closing over the same stale
-  // `isSending: false`. This ref is checked and set synchronously instead, so
-  // it can't miss the same race. Keyed by tab id (not a single flag) since
-  // sending from two different tabs at once is intentionally allowed.
+  // A ref, not `isSending`: a double-click calls this twice before the re-render.
   const sendingTabIds = useRef<Set<string>>(new Set());
 
   async function handleSend(e: React.FormEvent) {
@@ -395,12 +335,6 @@ export function useRequestTabs({
     sendingTabIds.current.add(tabId);
     updateActiveRequest({ error: null, response: null, isSending: true });
 
-    // A broken pre/post-request script doesn't block the send — it's
-    // recorded as a failure in the Logs tab, and the request still goes out
-    // with whatever the script managed to set up before it threw. Progress
-    // callbacks update the tab as each stage completes (response shown as
-    // soon as it arrives, not held back until the post-response script also
-    // finishes), matching how a single send always behaved.
     const result = await sendRequestWithScripts(
       activeRequest,
       variableContext,

@@ -11,23 +11,12 @@ interface VariableHoverPopupContentProps {
   environment: Environment | null;
   variableContext: VariableLookup;
   onUpdateVariable: (name: string, value: string) => void;
-  // Adds `name` to the active environment as a new, empty-value variable —
-  // the "unresolved" branch's quick-fix, so a typo'd/never-defined
-  // `{{var}}` can be created on the spot instead of leaving the popup to do
-  // it by hand in the full Environment editor.
   onCreateVariable: (name: string) => void;
   onOpenEnvironment: () => void;
   onOpenVariablesPanel: () => void;
 }
 
-// The popup's actual content: resolved value (editable, unless the raw
-// value contains a further {{other}} reference), an "unresolved"/"circular
-// reference" notice, or links to the full Environment editor / Variables
-// panel. Split out from `VariableHoverPopup` below so CodeMirror's own
-// hover-tooltip extension (variableHoverTooltip.tsx, used by the Body
-// editor) can render it directly into the tooltip DOM node CodeMirror
-// already positions — without the portal/fixed-rect positioning that
-// `VariableAwareInput` still needs, since it isn't CodeMirror-based.
+// Separate from VariableHoverPopup so the CodeMirror tooltip can render it directly.
 export function VariableHoverPopupContent({
   name,
   environment,
@@ -38,11 +27,7 @@ export function VariableHoverPopupContent({
   onOpenVariablesPanel,
 }: VariableHoverPopupContentProps) {
   const resolution = resolveVariable(name, variableContext);
-  // The value field only writes straight back into the variable's raw
-  // value (via onUpdateVariable) when that raw value is a direct literal —
-  // if it itself contains {{other}} tokens, editing the *resolved* text
-  // here would silently overwrite that reference with a flattened literal,
-  // destroying it.
+  // Editable only for a literal value — editing a resolved {{ref}} would flatten it.
   const rawValue = variableContext.lookup(name);
   const isDirectValue = rawValue !== undefined && tokenizeVariables(rawValue).length === 0;
 
@@ -99,10 +84,7 @@ export function VariableHoverPopupContent({
   );
 }
 
-// Shared by VariableAwareInput — positions VariableHoverPopupContent as a
-// fixed-position portal below the hovered token's real DOM rect. (The Body
-// editor no longer uses this: CodeMirror positions its own tooltips, so it
-// renders VariableHoverPopupContent directly — see variableHoverTooltip.tsx.)
+// Portal positioning for VariableAwareInput; CodeMirror positions its own tooltips.
 export function VariableHoverPopup({
   hover,
   environment,

@@ -25,14 +25,10 @@ interface UseEnvironmentsParams {
 
 export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
   const [environments, setEnvironments] = useState<Environment[]>([]);
-  // Which environment is active is a lightweight UI preference (not shared
-  // request data), so it lives in localStorage rather than round-tripping
-  // through Rust like the environments themselves.
   const [activeEnvironmentId, setActiveEnvironmentId] = useState<string | null>(
     () => localStorage.getItem("curlyq-active-environment-id")
   );
 
-  // Restore saved environments, if any, on mount.
   useEffect(() => {
     invoke<Environment[]>("load_environments").then((saved) => {
       if (saved.length > 0) {
@@ -43,9 +39,6 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
     });
   }, []);
 
-  // Debounced autosave, same pattern as tabs. Strips the always-present blank
-  // trailing variable row so environments.json doesn't accumulate an
-  // empty-key/empty-value entry per environment.
   useEffect(() => {
     const timeout = setTimeout(() => {
       invoke("save_environments", {
@@ -64,10 +57,6 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
   }, [activeEnvironmentId]);
 
   const activeEnvironment = environments.find((e) => e.id === activeEnvironmentId) ?? null;
-  // The one shared lookup every variable-consuming call in the app resolves
-  // against — wraps the active environment as a `VariableScope` so a future
-  // second scope (e.g. collection-level variables) only means adding another
-  // scope to this list, not touching every call site again.
   const variableContext = useMemo(
     () => createVariableContext([environmentScope(activeEnvironment)]),
     [activeEnvironment]
@@ -76,21 +65,14 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
   const [environmentEditorOpen, setEnvironmentEditorOpen] = useState(false);
   const [editingEnvironmentId, setEditingEnvironmentId] = useState<string | null>(null);
 
-  // openEnvironmentEditor/handleAddEnvironment/handleImportEnvironment/
-  // handleExportEnvironment/handleDeleteEnvironment/requestDeleteEnvironment
-  // are wrapped in useCallback (unlike handleRenameEnvironment etc. below)
-  // because they're passed down to Sidebar, which is wrapped in
-  // React.memo — any of them getting a new identity every App render (e.g.
-  // while typing in the active request's URL/body) would defeat that.
+  // useCallback: these reach the React.memo'd Sidebar.
   const openEnvironmentEditor = useCallback((id: string) => {
     setEditingEnvironmentId(id);
     setEnvironmentEditorOpen(true);
   }, []);
 
   const handleAddEnvironment = useCallback(() => {
-    // Name is derived from `prev` inside the updater (not the `environments`
-    // closure) so rapid clicks queued before a re-render each still see the
-    // true current list instead of a stale one.
+    // Derived from `prev` so rapid clicks don't pick the same name.
     const id = crypto.randomUUID();
     setEnvironments((prev) => [...prev, { ...createEnvironment(nextEnvironmentName(prev)), id }]);
     setEditingEnvironmentId(id);
@@ -168,11 +150,7 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
     [environments, activeEnvironmentId, editingEnvironmentId]
   );
 
-  // Only environments that actually have variables get a confirmation —
-  // deleting an empty one is low-risk and stays instant, matching the same
-  // rule collections already use for folders/collections. Stores just the id
-  // (not a callback) so there's nothing stale to invoke — the confirm action
-  // always re-reads the current environment list by id.
+  // Stores the id, not a callback, so confirming always reads the current list.
   const [pendingDeleteEnvironmentId, setPendingDeleteEnvironmentId] = useState<string | null>(null);
   const pendingDeleteEnvironment = environments.find((e) => e.id === pendingDeleteEnvironmentId) ?? null;
 
@@ -222,10 +200,6 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
     [editingEnvironmentId]
   );
 
-  // Edits a variable's value straight from the {{var}} hover popup, by name,
-  // in whichever environment is active — deliberately independent of
-  // `editingEnvironmentId` above, since the popup can be used whether or not
-  // the Environment editor dialog happens to be open.
   const updateActiveEnvironmentVariable = useCallback(
     (name: string, value: string) => {
       if (activeEnvironmentId === null) return;
@@ -240,12 +214,6 @@ export function useEnvironments({ onLogEntry }: UseEnvironmentsParams) {
     [activeEnvironmentId]
   );
 
-  // Bulk-upserts a pre-request/post-response script's `ctx.environment.set`
-  // calls into the active environment in one shot, rather than one
-  // `updateActiveEnvironmentVariable` call per key — a script can set several
-  // variables in a single run. Existing keys are updated in place; new keys
-  // are appended, then the trailing-blank-row invariant (see keyValue.ts) is
-  // restored since a new row was just spliced in above it.
   const applyEnvironmentPatch = useCallback(
     (patch: Record<string, string>) => {
       const entries = Object.entries(patch);

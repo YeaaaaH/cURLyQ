@@ -40,11 +40,7 @@ export function CollectionsSection({
   onMoveNode,
   runningId,
 }: CollectionsSectionProps) {
-  // Controlled (rather than the Collapsible's own defaultOpen) so the
-  // wrapper's flex-1 can be gated on it below — otherwise collapsing this
-  // section would still leave its wrapper claiming all leftover sidebar
-  // height for nothing, pushing Environments/the log panel down behind a
-  // dead gap instead of the two sections sitting flush together.
+  // Controlled so flex-1 can be dropped when collapsed, leaving no dead gap.
   const [persistedOpen, setPersistedOpen] = usePersistedBoolean(COLLECTIONS_SECTION_OPEN_KEY, true);
   const [isOpen, setOpen] = useSearchForcedOpen(query, persistedOpen, setPersistedOpen);
 

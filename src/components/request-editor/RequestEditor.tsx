@@ -50,16 +50,8 @@ export function RequestEditor({
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: RequestEditorProps) {
-  // "Save as" always opens the picker, even for a tab that already has a
-  // source — forking a copy rather than overwriting the linked request.
-  // Purely local to this editor: nothing outside it needs to know whether
-  // the picker is open.
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
-  // The explicit Save gesture (Ctrl+S / Save button). A tab already linked
-  // to a collection request updates that request in place; a fresh,
-  // never-saved tab has nowhere to save *to* yet, so it opens the "Save
-  // to..." picker instead.
   function handleSave() {
     if (!activeRequest.sourceRequestId || !activeRequest.sourceCollectionId) {
       setSaveDialogOpen(true);
@@ -73,12 +65,6 @@ export function RequestEditor({
     setSaveDialogOpen(false);
   }
 
-  // Ctrl+S (Cmd+S on macOS) saves the active tab from anywhere in the
-  // window, matching every other editor's muscle memory — without
-  // preventDefault the browser's native "Save page" dialog would fire
-  // instead. Registered here rather than in App.tsx since it's just the
-  // keyboard path to the same handleSave this editor already owns, and this
-  // component is always mounted whenever there's an active request.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key.toLowerCase() !== "s" || !(e.ctrlKey || e.metaKey)) return;

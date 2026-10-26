@@ -12,8 +12,6 @@ import { ChevronDown, ChevronRight, Folder, FolderPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Collection, CollectionNode } from "@/lib/collections";
 
-// The dialog's notion of "where to save" — a collection root (parentFolderId
-// null) or a specific folder nested inside one.
 interface Target {
   collectionId: string;
   parentFolderId: string | null;
@@ -23,8 +21,6 @@ function sameTarget(a: Target | null, b: Target): boolean {
   return a !== null && a.collectionId === b.collectionId && a.parentFolderId === b.parentFolderId;
 }
 
-// One row per folder (requests aren't valid save targets, so they're skipped
-// entirely — only collections/folders render). Recurses into subfolders.
 function FolderRows({
   collectionId,
   nodes,
@@ -107,9 +103,6 @@ export function SaveRequestDialog({
   const [selected, setSelected] = useState<Target | null>(null);
   const [openCollections, setOpenCollections] = useState<Record<string, boolean>>({});
 
-  // Reset the draft name, selection, and expanded collections each time the
-  // dialog opens, rather than carrying over whatever was left from the last
-  // time it was used.
   useEffect(() => {
     if (open) {
       setName(defaultName);

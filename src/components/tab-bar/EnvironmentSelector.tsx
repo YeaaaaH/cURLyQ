@@ -36,10 +36,7 @@ export function EnvironmentSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        // <main> has a fixed p-6 (1.5rem) padding and this trigger is the
-        // last element in its top row, so the trigger's right edge is
-        // always exactly `100vw - 1.5rem` — no DOM measurement needed to
-        // keep the menu's left edge from crossing the window's midpoint.
+        // The trigger's right edge is always 100vw - 1.5rem (<main>'s p-6), no measuring needed.
         className="scrollbar-thin w-64 max-w-[calc(50vw-1.5rem)] max-h-[min(50vh,var(--radix-dropdown-menu-content-available-height))]"
       >
         <DropdownMenuRadioGroup

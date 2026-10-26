@@ -55,8 +55,6 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
     const newFolderId = onAddFolder(collectionId, node.id);
     onStartRename(newFolderId);
     setOpen(node.id, true);
-    // The folder you just made defaults open too, not just its parent — you
-    // made it to put something in it, so you want to see inside right away.
     setOpen(newFolderId, true);
   }
 
@@ -76,10 +74,7 @@ function FolderRow({ collectionId, node, depth, handlers }: FolderRowProps) {
           style={{ paddingLeft: depth * TREE_INDENT_PX }}
         >
           {isRenaming ? (
-            // Not a CollapsibleTrigger (i.e. not a <button>) while renaming —
-            // an <input> nested inside a <button> is invalid HTML, and in
-            // practice the button swallows focus/clicks so the input can
-            // never actually be typed into.
+            // Not a <button> while renaming: an <input> inside a button can't be typed into.
             <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground">
               <span className="flex w-8 shrink-0 items-center gap-0.5">
                 <ChevronDown className="size-3 shrink-0" />
@@ -159,19 +154,13 @@ function RequestRow({ collectionId, node, depth, handlers }: RequestRowProps) {
       className={cn(
         "group/node flex shrink-0 items-center rounded-md border-t-2",
         dnd.isDragging && "opacity-40",
-        // Dropping on a request always means "insert before it," so a line
-        // above the row shows exactly where the dragged item will land. A
-        // toggled border color (width always reserved) instead of an
-        // absolutely-positioned overlay — the latter rendered at a
-        // different sub-pixel Y-offset per row depending on scroll
-        // position and looked visibly blurred on some rows.
+        // A border color, not an absolute overlay, which rendered blurry at some scroll offsets.
         dnd.isOver ? cn("rounded-t-none", ACTIVE_DROP_BORDER_CLASS) : "border-transparent"
       )}
       style={{ paddingLeft: depth * TREE_INDENT_PX }}
     >
       {isRenaming ? (
-        // Not a <button> while renaming — see the matching comment in
-        // FolderRow for why an <input> can't live inside one.
+        // Not a <button> while renaming (see FolderRow).
         <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground">
           <span
             className={cn(
@@ -248,8 +237,6 @@ export function CollectionRow({
   runningId,
 }: CollectionRowProps) {
   const isRunning = runningId === collection.id;
-  // Collections cannot be dragged but remain valid drop targets for content
-  // dropped onto their root.
   const dnd = useTreeDragAndDrop(collection.id, isRenaming, false);
 
   function addRootRequest() {
@@ -273,8 +260,7 @@ export function CollectionRow({
         className={cn("group/node flex shrink-0 items-center rounded-md", dnd.isOver && "bg-accent")}
       >
         {isRenaming ? (
-          // Not a CollapsibleTrigger (i.e. not a <button>) while renaming —
-          // see the matching comment in FolderRow for why.
+          // Not a <button> while renaming (see FolderRow).
           <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground">
             <span className="flex w-8 shrink-0 items-center gap-0.5">
               <ChevronDown className="size-3 shrink-0" />

@@ -2,15 +2,7 @@ import { StateEffect, StateField } from "@codemirror/state";
 import type { Environment } from "@/lib/environments";
 import type { VariableLookup } from "@/lib/variables";
 
-// The Body editor's variable-token decorations and hover tooltip both need
-// the current environment/variableContext/callbacks — but CodeMirror
-// extensions are only read once, on mount (see useCodeMirrorEditor's
-// comment), while these can change on almost any render (switching the
-// active environment, editing a variable elsewhere). A StateField holds the
-// *current* value inside CodeMirror's own state, updated by dispatching
-// `setVariableAwareConfig` whenever the caller's props change — both
-// `variableDecorations.ts` and `variableHoverTooltip.tsx` read it fresh off
-// `view.state` rather than closing over a stale React prop.
+// Extensions are read once on mount, so live props reach them through this StateField.
 export interface VariableAwareConfig {
   environment: Environment | null;
   variableContext: VariableLookup;

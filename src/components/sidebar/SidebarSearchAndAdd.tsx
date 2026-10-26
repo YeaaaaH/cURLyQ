@@ -26,10 +26,7 @@ export function SidebarSearchAndAdd({
   onImportEnvironment,
   onImportCollection,
 }: SidebarSearchAndAddProps) {
-  // Terminal swaps the magnifying glass for a "$" prompt glyph and the
-  // placeholder for "grep" — can't be done as a token since it's a change of
-  // icon/text, not just color, so it's this component's one deliberate
-  // exception to "never branch on theme".
+  // An icon/text swap can't be a theme token — the one deliberate branch on theme.
   const { theme } = useTheme();
   const isTerminal = theme === "terminal";
 

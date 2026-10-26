@@ -26,16 +26,12 @@ import type { PendingDelete, TreeHandlers } from "./types";
 
 const DRAG_EXPAND_DWELL_MS = 600;
 
-// Stable empty set so a blank query doesn't allocate (or force any renders
-// off) a new reveal set every render.
 const NO_REVEAL_IDS: ReadonlySet<string> = new Set();
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-// "2 folders and 5 requests" — used to word a delete confirmation before a
-// cascading delete.
 function describeCounts(counts: { folders: number; requests: number }): string {
   return [
     counts.folders > 0 ? pluralize(counts.folders, "folder") : null,
@@ -80,21 +76,14 @@ export function CollectionTree({
 }: CollectionTreeProps) {
   const treeState = useCollectionTreeState();
 
-  // Ephemeral, fresh per keystroke, and never written back to treeState's
-  // persisted expand state — clearing the query reverts to exactly whatever
-  // was expanded before searching.
+  // Never written to persisted expand state, so clearing the query restores it.
   const revealIds = useMemo(
     () => (query.trim() !== "" ? collectContainerIds(collections) : NO_REVEAL_IDS),
     [collections, query]
   );
 
-  // A revealed container still needs to be manually closable — otherwise a
-  // click on its chevron while searching visibly does nothing, since it'd
-  // stay force-opened by revealIds regardless. Tracks ids the user
-  // explicitly closed while they were force-opened, ephemeral like revealIds
-  // itself: reset on every keystroke ("adjusting state during render" rather
-  // than an effect, so the reset lands in the same commit as the new
-  // query's revealIds instead of flashing open-then-closed a frame later).
+  // Lets a force-revealed container still be closed. Reset during render, not in an
+  // effect, so it lands in the same commit as the new revealIds.
   const [collapsedReveals, setCollapsedReveals] = useState<ReadonlySet<string>>(NO_REVEAL_IDS);
   const [queryAtLastReset, setQueryAtLastReset] = useState(query);
   if (query !== queryAtLastReset) {
@@ -124,10 +113,6 @@ export function CollectionTree({
     [revealIds, treeState.setOpen]
   );
 
-  // Only non-empty folders/collections get a confirmation — deleting a lone
-  // request or an already-empty container is low-risk and stays instant.
-  // Explicit + serializable rather than a stored callback, so confirming is
-  // deterministic and doesn't depend on a closure captured at request time.
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   function requestDeleteNode(collectionId: string, node: CollectionNode) {
@@ -176,19 +161,11 @@ export function CollectionTree({
     setPendingDelete(null);
   }
 
-  // A small movement threshold before a press counts as a drag, so plain
-  // clicks (open a request, expand a folder, hit a menu button) still work
-  // normally — only a real drag exceeds it.
+  // Movement threshold so plain clicks aren't treated as drags.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
 
-  // Dwell-to-expand: hovering a drag over a closed folder/collection for
-  // DRAG_EXPAND_DWELL_MS opens it, so dropping *into* a collapsed container
-  // doesn't require manually opening it first mid-drag. Only fires for a
-  // container's own droppable id (a "nest inside" target, per
-  // TreeDragAndDrop.tsx) — not the before/end reorder drop-zones, and not a
-  // container that's already open.
   const dwellTimerRef = useRef<number | null>(null);
   const dwellTargetIdRef = useRef<string | null>(null);
 

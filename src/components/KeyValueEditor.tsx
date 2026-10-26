@@ -9,9 +9,6 @@ import type { Environment } from "@/lib/environments";
 import type { VariableLookup } from "@/lib/variables";
 import { VariableAwareInput } from "@/components/VariableAwareInput";
 
-// Bundled together (rather than 5 separate props) since they only ever
-// travel as a set — the Value column below is variable-aware only when
-// this whole set is provided.
 export interface VariableAwareProps {
   environment: Environment | null;
   variableContext: VariableLookup;
@@ -21,18 +18,9 @@ export interface VariableAwareProps {
   onOpenVariablesPanel: () => void;
 }
 
-// Shared column template for the header label row and every data row below
-// it — checkbox / key / value / trash, in that order. One definition both
-// live in means the columns are structurally guaranteed to line up (a grid
-// track is a grid track); no more matching flex-basis/min-width by hand
-// across locked vs. editable rows, which is what caused the repeated
-// mis-alignment bugs the flex-based version had.
+// One grid template for the label row and every data row keeps columns aligned.
 const GRID_COLUMNS = "grid grid-cols-[16px_1fr_1fr_32px] items-center gap-2";
 
-// One shared row shape for both the locked (read-only default headers) and
-// editable rows — a single markup path they both render through, rather than
-// two hand-copied JSX blocks that only stay in sync if someone remembers to
-// update both.
 function Row({
   keyValue,
   valueValue,
@@ -49,8 +37,6 @@ function Row({
   valueValue: string;
   locked: boolean;
   checked: boolean;
-  // The row just revealed by "+ Add" — focus its Key field immediately
-  // rather than making the user click into it themselves.
   autoFocusKey?: boolean;
   onCheckedChange?: (checked: boolean) => void;
   onKeyChange?: (value: string) => void;
@@ -128,26 +114,14 @@ export const KeyValueEditor = memo(function KeyValueEditor({
   rows: KeyValuePair[];
   onUpdate: (index: number, patch: Partial<KeyValuePair>) => void;
   onRemove: (index: number) => void;
-  // Read-only rows shown above the editable ones — e.g. default headers
-  // that are sent automatically. Not part of `rows`/persisted data; purely
-  // informational, so there's no enabled/remove affordance for them.
+  // Informational only (e.g. default headers); not part of `rows`.
   lockedRows?: { key: string; value: string }[];
-  // Omitted by the Environment editor, which uses this same component to
-  // edit a variable's own raw value — {{var}} coloring/hover against the
-  // variable currently being defined isn't in scope there. When omitted,
-  // the Value column falls back to a plain Input.
+  // Omitted when editing a variable's own value; falls back to a plain Input.
   variableAware?: VariableAwareProps;
-  // Label for the "+ Add ___" button — e.g. "header", "param", "variable".
   itemLabel?: string;
 }) {
-  // `rows` always keeps exactly one trailing blank entry (see
-  // ensureTrailingBlankRow/updateRows in lib/keyValue.ts) so there's
-  // somewhere to type a new row into — but showing that blank row as a live
-  // input all the time doesn't match the design (an explicit "+ Add" button
-  // instead). So it stays hidden, replaced by the button, until the button
-  // is clicked; comparing ids (not just "is blank") means the button
-  // reappears on its own once *this* row fills in and a fresh blank one
-  // takes its place, without needing to reset any state manually.
+  // The trailing blank row stays hidden behind "+ Add" until clicked; tracking its id
+  // brings the button back once that row fills in.
   const [addingRowId, setAddingRowId] = useState<string | null>(null);
   const lastRow = rows[rows.length - 1];
   const lastRowIsBlank = lastRow.key.trim() === "" && lastRow.value.trim() === "";

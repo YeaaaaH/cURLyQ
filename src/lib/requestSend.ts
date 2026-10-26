@@ -7,12 +7,6 @@ import { resolveRequest } from "@/lib/variables/requestResolver";
 import { runPostResponseScript, runPreRequestScript } from "@/lib/scripting/runScript";
 import { type LastScriptRun, createEmptyScriptRun } from "@/lib/requestTabs";
 
-// Flattens the active environment's enabled, non-empty-key variables into the
-// plain Record a script sandbox worker can receive via postMessage (a
-// VariableLookup's `.lookup()` closure can't cross that boundary). Exported
-// so a caller that needs to layer extra values on top (e.g. a collection
-// run's accumulated cross-step variables) can spread over the result rather
-// than reimplementing this flattening.
 export function environmentToRecord(environment: Environment | null): Record<string, string> {
   const record: Record<string, string> = {};
   if (!environment) return record;
@@ -30,9 +24,6 @@ function headersToRecord(headers: KeyValuePair[]): Record<string, string> {
   return record;
 }
 
-// Applies a pre-request script's `ctx.request.headers.set` calls onto a
-// header row list: updates a matching key in place, appends a new row for an
-// unseen one. Only ever affects the copy used for this one send.
 function applyHeaderPatch(headers: KeyValuePair[], patch: Record<string, string>): KeyValuePair[] {
   let result = headers;
   for (const [key, value] of Object.entries(patch)) {
@@ -45,14 +36,8 @@ function applyHeaderPatch(headers: KeyValuePair[], patch: Record<string, string>
   return result;
 }
 
-// A pre-request script's ctx.environment.set calls apply to the *stored*
-// environment asynchronously (a React state update), which wouldn't be
-// reflected in the caller's `variableContext` until the next render — too
-// late for this same send. Layering the patch in front of the existing
-// lookup gives `resolveRequest` an immediately up-to-date view without
-// waiting on that re-render. Exported for the same reason as
-// `environmentToRecord` above — a collection run needs the same trick
-// across steps, not just within one.
+// The stored environment only updates on the next React render — too late
+// for the send that's already in progress.
 export function withEnvironmentPatch(base: VariableLookup, patch: Record<string, string>): VariableLookup {
   if (Object.keys(patch).length === 0) return base;
   return {
@@ -78,27 +63,12 @@ export interface SendResult {
   scriptRun: LastScriptRun;
 }
 
-// Progress hooks so a live request tab can update its UI as each stage
-// completes (response shown as soon as it arrives, not held back until the
-// post-response script also finishes) — callers that don't need intermediate
-// state (e.g. a headless collection run) can just await the final
-// `SendResult` and ignore these.
 export interface SendCallbacks {
   onPreScriptComplete?: (scriptRun: LastScriptRun) => void;
   onResponse?: (response: HttpResponse) => void;
   onPostScriptComplete?: (scriptRun: LastScriptRun) => void;
 }
 
-// The full "run pre-script -> resolve variables -> send -> run post-script"
-// pipeline for one request, independent of any request tab — used by both a
-// live tab's Send button and (headlessly) a collection run. A broken pre/post
-// script never blocks the send; it's just recorded in the returned
-// `scriptRun`, same treatment either half gets on success.
-//
-// Takes an already-flattened `environmentRecord` rather than an `Environment`
-// object so a collection run can layer earlier steps' `ctx.environment.set()`
-// output on top before calling this for a later step — the live active
-// environment alone wouldn't reflect those mid-run (see collectionRun.ts).
 export async function sendRequestWithScripts(
   request: SendableRequest,
   variableContext: VariableLookup,
@@ -109,6 +79,7 @@ export async function sendRequestWithScripts(
   let scriptRun = createEmptyScriptRun();
   let requestForSend: SendableRequest = request;
   let effectiveContext = variableContext;
+  let postEnvironmentRecord = environmentRecord;
 
   if (request.preRequestScript.trim() !== "") {
     const preResult = await runPreRequestScript(
@@ -121,6 +92,7 @@ export async function sendRequestWithScripts(
 
     if (Object.keys(preResult.environmentPatch).length > 0) applyEnvironmentPatch(preResult.environmentPatch);
     effectiveContext = withEnvironmentPatch(variableContext, preResult.environmentPatch);
+    postEnvironmentRecord = { ...environmentRecord, ...preResult.environmentPatch };
 
     if (preResult.requestPatch) {
       requestForSend = {
@@ -143,7 +115,7 @@ export async function sendRequestWithScripts(
       const postResult = await runPostResponseScript(
         request.postResponseScript,
         { status: response.status, headers: Object.fromEntries(response.headers), body: response.body },
-        environmentRecord
+        postEnvironmentRecord
       );
       scriptRun = { ...scriptRun, post: postResult };
       callbacks.onPostScriptComplete?.(scriptRun);

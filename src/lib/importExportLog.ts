@@ -3,12 +3,8 @@ export interface ImportExportLogEntry {
   timestamp: number;
   direction: "import" | "export";
   kind: "environment" | "collection";
-  // The environment/collection's own name on success; the picked/target file
-  // name on failure, since a failed parse may never produce a name to show.
+  // The file name on failure, since a failed parse may never yield a name.
   label: string;
-  // Pre-formatted, e.g. "12 variables" or "3 folders, 8 requests" — kept as
-  // free text rather than a structured count so environments and collections
-  // don't need separate fields for what's ultimately just a summary line.
   detail?: string;
   status: "success" | "error";
   message?: string;

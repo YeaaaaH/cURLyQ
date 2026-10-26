@@ -10,9 +10,6 @@ import type { ScriptHalf } from "@/lib/scripting/types";
 import { SubTabSwitcher } from "./SubTabSwitcher";
 import { ScriptsTab } from "./scripts/ScriptsTab";
 
-// Which of DEFAULT_HEADERS aren't already covered by one of the user's own
-// header rows (case-insensitive, non-empty key) — those are shown as locked
-// rows; a header the user set explicitly always wins instead of doubling up.
 function unmatchedDefaultHeaders(headers: KeyValuePair[]) {
   return DEFAULT_HEADERS.filter(
     (def) => !headers.some((h) => h.key.trim().toLowerCase() === def.key.toLowerCase())
