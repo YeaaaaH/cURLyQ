@@ -3,6 +3,38 @@
 Compact history of what's shipped, by feature. Newest first. For open/planned work, see
 `.tasks/plan.md`.
 
+## Request and response UX (2026-10-26)
+
+Small fixes and conveniences pulled off a product review; the medium/large items from the
+same review went into `plan.md`.
+
+- **Send with Ctrl+Enter** from anywhere (`UrlBar.tsx`). Listens in the capture phase so
+  it wins over CodeMirror's own Mod-Enter (`insertBlankLine`) in the body/script editors,
+  and goes through `form.requestSubmit()` so `canSend` and the double-send guard still
+  apply. Ignored while a dialog is open.
+- **HEAD and OPTIONS methods**, with their own color tokens per theme. Narrow method
+  labels (tree rows, drag preview, run results) show `OPT` via `shortMethodLabel`.
+- **Copy buttons** for the response body (as displayed, i.e. pretty-printed) and headers
+  (`Name: value` lines), via a shared `CopyButton` that also gives the cURL preview
+  "copied" feedback it lacked.
+- **Duplicate** for collections, folders, and requests: a deep copy with fresh ids
+  (including param/header rows) right below the original. Names strip an existing
+  ` copy`/` copy (N)` suffix and dedupe against siblings, so copying a copy gives
+  `X copy (2)` rather than `X copy copy`.
+- **Beautify** for the JSON body (`formatJsonBody`). A token-level re-indenter rather than
+  `JSON.parse`/`stringify`, which would round 64-bit ids, reorder integer-like keys, drop
+  duplicate keys, rewrite `1.0`/`1e2`, and lose `{{vars}}` and comments — all preserved
+  here. Enabled only when the body is valid JSON.
+- **Binary responses** (images, PDF, archives — `is_binary_content_type` in `lib.rs`) are
+  no longer decoded as text: `.text()` never errored, it rendered mojibake and pushed the
+  whole payload over IPC. They now return `isBinary: true`, an empty body, and their
+  size; the viewer shows a one-line placeholder. Text bodies still go through `.text()`
+  so the response charset is honored.
+- **Postman import reports dropped scripts** (collection-, folder-, and request-level) in
+  the toast and the import log, instead of losing them silently.
+- **Docs**: `scripting.md` no longer claims scripts can't reach anything — the Worker has
+  network access and sees the whole environment, now called out there and in the README.
+
 ## Postman scripting/export compatibility (2026-08-11)
 
 Collection export (`buildPostmanCollection`/`buildPostmanItems` in

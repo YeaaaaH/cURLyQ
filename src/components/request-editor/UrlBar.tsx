@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Braces, Loader2 } from "lucide-react";
@@ -42,8 +43,23 @@ export function UrlBar({
   onOpenEnvironment,
   onOpenVariablesPanel,
 }: UrlBarProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+      if (e.target instanceof Element && e.target.closest("[role=dialog]")) return;
+      // Capture phase + stopPropagation: CodeMirror binds Mod-Enter to insertBlankLine.
+      e.preventDefault();
+      e.stopPropagation();
+      formRef.current?.requestSubmit();
+    }
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
+
   return (
-    <form className="flex flex-col gap-1.5" onSubmit={onSend}>
+    <form ref={formRef} className="flex flex-col gap-1.5" onSubmit={onSend}>
       <div className="flex gap-2">
         <Select value={method} onValueChange={onMethodChange}>
           <SelectTrigger className={cn("w-28 font-semibold", METHOD_COLORS[method])}>
@@ -80,7 +96,7 @@ export function UrlBar({
         >
           <Braces className="size-4" />
         </Button>
-        <Button type="submit" className="w-24" disabled={isSending || !canSend}>
+        <Button type="submit" className="w-24" disabled={isSending || !canSend} title="Send (Ctrl+Enter)">
           {isSending && <Loader2 className="size-3.5 animate-spin" />}
           {isSending ? "Sending…" : "Send"}
         </Button>

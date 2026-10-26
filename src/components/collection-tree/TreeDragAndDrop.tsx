@@ -1,7 +1,7 @@
 import { DragOverlay, useDraggable, useDroppable } from "@dnd-kit/core";
 import { Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { METHOD_COLORS } from "@/lib/http";
+import { METHOD_COLORS, shortMethodLabel } from "@/lib/http";
 import { beforeZoneId, endZoneId, locateNode, type Collection } from "@/lib/collections";
 import { ACTIVE_DROP_BORDER_CLASS, DROP_ZONE_OFFSET_PX, TREE_INDENT_PX } from "./constants";
 
@@ -95,7 +95,7 @@ export function TreeDragOverlay({ preview }: TreeDragOverlayProps) {
                 METHOD_COLORS[preview.method]
               )}
             >
-              {preview.method}
+              {shortMethodLabel(preview.method)}
             </span>
           ) : (
             <Folder className="size-3.5 shrink-0" />

@@ -231,6 +231,125 @@ export function stripJsonComments(text: string): string {
   return result;
 }
 
+const INDENT = "  ";
+const CLOSING: Record<string, string> = { "{": "}", "[": "]" };
+
+// Re-indents around structural characters only, copying strings, numbers, {{vars}} and
+// comments verbatim — JSON.parse/stringify would round big numbers, reorder integer-like
+// keys, drop duplicate keys and comments.
+export function formatJsonBody(text: string): string {
+  const variableAt = new RegExp(VARIABLE_PATTERN.source, "y");
+  let out = "";
+  let depth = 0;
+  let pendingBreak = false;
+  let sawNewline = false;
+  let spaceAfterComment = false;
+
+  function emit(token: string) {
+    if (pendingBreak) out += "\n" + INDENT.repeat(depth);
+    else if (spaceAfterComment) out += " ";
+    out += token;
+    pendingBreak = false;
+    sawNewline = false;
+    spaceAfterComment = false;
+  }
+
+  function emitComment(comment: string) {
+    if (pendingBreak && !sawNewline && out !== "") {
+      out += " " + comment;
+      sawNewline = false;
+    } else {
+      emit(comment);
+    }
+  }
+
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (/\s/.test(ch)) {
+      if (ch === "\n") sawNewline = true;
+      i++;
+      continue;
+    }
+
+    variableAt.lastIndex = i;
+    const variable = variableAt.exec(text);
+    if (variable) {
+      emit(variable[0]);
+      i += variable[0].length;
+      continue;
+    }
+
+    if (ch === '"') {
+      let end = i + 1;
+      while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
+      emit(text.slice(i, end + 1));
+      i = end + 1;
+      continue;
+    }
+
+    if (ch === "/" && next === "/") {
+      const end = text.indexOf("\n", i);
+      emitComment(text.slice(i, end === -1 ? text.length : end));
+      pendingBreak = true;
+      i = end === -1 ? text.length : end;
+      continue;
+    }
+
+    if (ch === "/" && next === "*") {
+      const end = text.indexOf("*/", i + 2);
+      const stop = end === -1 ? text.length : end + 2;
+      emitComment(text.slice(i, stop));
+      spaceAfterComment = true;
+      i = stop;
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") {
+      let j = i + 1;
+      while (j < text.length && /\s/.test(text[j])) j++;
+      if (text[j] === CLOSING[ch]) {
+        emit(ch + CLOSING[ch]);
+        i = j + 1;
+      } else {
+        emit(ch);
+        depth++;
+        pendingBreak = true;
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "}" || ch === "]") {
+      depth = Math.max(0, depth - 1);
+      pendingBreak = true;
+      emit(ch);
+      i++;
+      continue;
+    }
+
+    if (ch === "," || ch === ":") {
+      const token = ch === ":" ? ": " : ",";
+      if (pendingBreak) emit(token);
+      else out += token;
+      sawNewline = false;
+      if (ch === ",") pendingBreak = true;
+      i++;
+      continue;
+    }
+
+    let end = i;
+    while (end < text.length && !/[\s{}[\],:"]/.test(text[end]) && !text.startsWith("//", end) && !text.startsWith("/*", end)) {
+      end++;
+    }
+    emit(text.slice(i, end));
+    i = end;
+  }
+  return out;
+}
+
 export function getBodyError(body: string, context: VariableLookup): string | null {
   const withoutComments = stripJsonComments(body);
   // Checked after stripping, so a fully commented-out body counts as empty.

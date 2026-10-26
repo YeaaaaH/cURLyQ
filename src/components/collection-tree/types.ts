@@ -15,6 +15,7 @@ export interface TreeHandlers {
   onAddRequest: AddTreeNode;
   onRunNode: (collectionId: string, node: CollectionNode) => void;
   onRenameNode: RenameNode;
+  onDuplicateNode: (nodeId: string) => void;
   requestDeleteNode: (collectionId: string, node: CollectionNode) => void;
   isOpen: (id: string, defaultOpen: boolean) => boolean;
   setOpen: SetExpanded;

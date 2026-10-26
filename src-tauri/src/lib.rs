@@ -12,6 +12,41 @@ struct HttpResponse {
     time_ms: u128,
     // Decoded body size; reqwest has already undone any Content-Encoding.
     size_bytes: usize,
+    // `body` is left empty: decoding images/PDFs as text only produces mojibake.
+    is_binary: bool,
+}
+
+fn is_binary_content_type(content_type: &str) -> bool {
+    let mime = content_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    let Some((kind, subtype)) = mime.split_once('/') else {
+        return false;
+    };
+    match kind {
+        "image" => subtype != "svg+xml",
+        "audio" | "video" | "font" => true,
+        "application" => {
+            matches!(
+                subtype,
+                "octet-stream"
+                    | "pdf"
+                    | "zip"
+                    | "gzip"
+                    | "x-gzip"
+                    | "x-tar"
+                    | "x-7z-compressed"
+                    | "vnd.rar"
+                    | "wasm"
+                    | "msword"
+            ) || subtype.starts_with("vnd.openxmlformats")
+                || subtype.starts_with("vnd.ms-")
+        }
+        _ => false,
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -138,10 +173,22 @@ async fn send_request(
             )
         })
         .collect::<Vec<_>>();
-    let body = response.text().await.map_err(|e| e.to_string())?;
+    let is_binary = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(is_binary_content_type);
+    // .text() is kept for text bodies: it honors the Content-Type charset.
+    let (body, size_bytes) = if is_binary {
+        let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+        (String::new(), bytes.len())
+    } else {
+        let text = response.text().await.map_err(|e| e.to_string())?;
+        let size = text.len();
+        (text, size)
+    };
     // Measured after the body is read: for a chunked body, send() returns at headers.
     let time_ms = start.elapsed().as_millis();
-    let size_bytes = body.len();
 
     Ok(HttpResponse {
         status,
@@ -149,6 +196,7 @@ async fn send_request(
         body,
         time_ms,
         size_bytes,
+        is_binary,
     })
 }
 
@@ -258,6 +306,44 @@ mod collection_node_tests {
         let parsed: Collection = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, original.id);
         assert_eq!(parsed.items.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod content_type_tests {
+    use super::is_binary_content_type;
+
+    #[test]
+    fn detects_binary_types() {
+        for content_type in [
+            "image/png",
+            "IMAGE/JPEG",
+            "application/pdf",
+            "application/octet-stream",
+            "application/zip",
+            "audio/mpeg",
+            "font/woff2",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ] {
+            assert!(is_binary_content_type(content_type), "{content_type}");
+        }
+    }
+
+    #[test]
+    fn keeps_text_types_as_text() {
+        for content_type in [
+            "application/json",
+            "application/json; charset=utf-8",
+            "text/html; charset=windows-1251",
+            "text/plain",
+            "application/xml",
+            "image/svg+xml",
+            "application/x-www-form-urlencoded",
+            "",
+            "garbage",
+        ] {
+            assert!(!is_binary_content_type(content_type), "{content_type}");
+        }
     }
 }
 

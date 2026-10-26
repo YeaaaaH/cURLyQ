@@ -14,11 +14,13 @@ interface CollectionsSectionProps {
   onDeleteCollection: (id: string) => void;
   onRunCollection: (id: string) => void;
   onExportCollection: (id: string) => void;
+  onDuplicateCollection: (id: string) => void;
   onOpenRequest: (collectionId: string, node: RequestNode) => void;
   onAddFolder: (collectionId: string, parentFolderId: string | null) => string;
   onAddRequest: (collectionId: string, parentFolderId: string | null) => string;
   onRunNode: (collectionId: string, node: CollectionNode) => void;
   onRenameNode: (collectionId: string, nodeId: string, name: string) => void;
+  onDuplicateNode: (nodeId: string) => void;
   onDeleteNode: (collectionId: string, nodeId: string) => void;
   onMoveNode: (draggedId: string, targetId: string) => void;
   runningId: string | null;
@@ -31,11 +33,13 @@ export function CollectionsSection({
   onDeleteCollection,
   onRunCollection,
   onExportCollection,
+  onDuplicateCollection,
   onOpenRequest,
   onAddFolder,
   onAddRequest,
   onRunNode,
   onRenameNode,
+  onDuplicateNode,
   onDeleteNode,
   onMoveNode,
   runningId,
@@ -59,11 +63,13 @@ export function CollectionsSection({
             onDeleteCollection={onDeleteCollection}
             onRunCollection={onRunCollection}
             onExportCollection={onExportCollection}
+            onDuplicateCollection={onDuplicateCollection}
             onOpenRequest={onOpenRequest}
             onAddFolder={onAddFolder}
             onAddRequest={onAddRequest}
             onRunNode={onRunNode}
             onRenameNode={onRenameNode}
+            onDuplicateNode={onDuplicateNode}
             onDeleteNode={onDeleteNode}
             onMoveNode={onMoveNode}
             runningId={runningId}

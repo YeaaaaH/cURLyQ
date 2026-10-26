@@ -79,7 +79,10 @@ preview is exactly what gets sent.
 On the Rust side (`send_request` in `src-tauri/src/lib.rs`): one shared
 `reqwest::Client` with a 30s timeout; connect/timeout errors get a
 plain-language headline before the technical message; response headers are
-a `Vec<(String, String)>` so repeated headers (`Set-Cookie`) survive.
+a `Vec<(String, String)>` so repeated headers (`Set-Cookie`) survive. A
+binary Content-Type (`is_binary_content_type`: images, PDF, archives…) comes
+back as `isBinary: true` with an empty `body` and only its size; everything
+else is decoded with `.text()`, which honors the response charset.
 
 ## Variable engine (`src/lib/variables/`)
 

@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Folder, Loader2, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { CopyPlus, Download, Folder, Loader2, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import type { PendingDelete } from "./types";
 
 interface RenameInputProps {
@@ -104,12 +104,22 @@ interface NodeMenuProps {
   onNewRequest?: () => void;
   onRun?: () => void;
   onRename: () => void;
+  onDuplicate?: () => void;
   onExport?: () => void;
   onDelete: () => void;
   isRunning?: boolean;
 }
 
-export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport, onDelete, isRunning }: NodeMenuProps) {
+export function NodeMenu({
+  onNewFolder,
+  onNewRequest,
+  onRun,
+  onRename,
+  onDuplicate,
+  onExport,
+  onDelete,
+  isRunning,
+}: NodeMenuProps) {
   // Radix's dropdown pulls focus back during its close animation, stealing it from a
   // freshly mounted rename input — so the action runs in onCloseAutoFocus instead.
   const pendingActionRef = useRef<(() => void) | null>(null);
@@ -165,6 +175,12 @@ export function NodeMenu({ onNewFolder, onNewRequest, onRun, onRename, onExport,
           <Pencil className="size-3.5" />
           Rename
         </DropdownMenuItem>
+        {onDuplicate && (
+          <DropdownMenuItem onClick={deferUntilClosed(onDuplicate)}>
+            <CopyPlus className="size-3.5" />
+            Duplicate
+          </DropdownMenuItem>
+        )}
         {onExport && (
           <DropdownMenuItem onClick={deferUntilClosed(onExport)}>
             <Download className="size-3.5" />
