@@ -31,4 +31,5 @@ export interface HttpResponse {
   body: string;
   timeMs: number;
   sizeBytes: number;
+  isBinary: boolean;
 }

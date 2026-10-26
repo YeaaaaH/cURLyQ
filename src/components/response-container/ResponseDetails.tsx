@@ -13,6 +13,7 @@ interface ResponseDetailsProps {
 export function ResponseDetails({ response }: ResponseDetailsProps) {
   const body = formatBody(response.body);
   const headersText = response.headers.map(([name, value]) => `${name}: ${value}`).join("\n");
+  const contentType = response.headers.find(([name]) => name.toLowerCase() === "content-type")?.[1];
 
   const statusBadge = (
     <span className="flex items-center gap-2">
@@ -59,7 +60,13 @@ export function ResponseDetails({ response }: ResponseDetailsProps) {
           <p className="text-sm font-medium text-muted-foreground">Response Body</p>
           {body !== "" && <CopyButton text={body} label="Copy response body" />}
         </div>
-        <pre className="whitespace-pre-wrap break-words font-mono text-sm">{body}</pre>
+        {response.isBinary ? (
+          <p className="text-sm text-muted-foreground">
+            Binary response ({contentType ?? "unknown type"}, {formatSize(response.sizeBytes)}) — not displayed.
+          </p>
+        ) : (
+          <pre className="whitespace-pre-wrap break-words font-mono text-sm">{body}</pre>
+        )}
       </div>
     </Card>
   );
