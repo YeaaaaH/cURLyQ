@@ -1,9 +1,11 @@
+import { WandSparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { KeyValuePair } from "@/lib/keyValue";
 import { DEFAULT_HEADERS } from "@/lib/http";
 import type { Environment } from "@/lib/environments";
 import type { VariableLookup } from "@/lib/variables";
-import type { RequestTab, ScriptsSubTab } from "@/lib/requestTabs";
+import { type RequestTab, type ScriptsSubTab, formatJsonBody } from "@/lib/requestTabs";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 import { VariableAwareTextarea } from "@/components/VariableAwareTextarea";
 import type { ScriptHalf } from "@/lib/scripting/types";
@@ -98,7 +100,20 @@ export function RequestVariablesTabs({
               onOpenEnvironment={variableAware.onOpenEnvironment}
               onOpenVariablesPanel={variableAware.onOpenVariablesPanel}
             />
-            {bodyError && <p className="text-sm text-destructive">{bodyError}</p>}
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <p className="text-sm text-destructive">{bodyError}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={bodyError !== null || activeRequest.body.trim() === ""}
+                onClick={() => onUpdate({ body: formatJsonBody(activeRequest.body) })}
+                title={bodyError ?? "Format JSON"}
+              >
+                <WandSparkles />
+                Beautify
+              </Button>
+            </div>
           </div>
         )}
         {activeRequest.activeSubTab === "scripts" && (
