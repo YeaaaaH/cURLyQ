@@ -1,29 +1,27 @@
 ---
 name: react-dev
 version: 1.0.0
-description: This skill should be used when building React components with TypeScript, typing hooks, handling events, or when React TypeScript, React 19, Server Components are mentioned. Covers type-safe patterns for React 18-19 including generic components, proper event typing, and routing integration (TanStack Router, React Router).
+description: TypeScript typing patterns for cURLyQ's React 19 frontend — component props, event handlers, hooks, refs, and generic components. Use when writing or typing React components or hooks in src/. For styling and UI conventions, see curlyq-ui.
 ---
 
 # React TypeScript
 
 Type-safe React = compile-time guarantees = confident refactoring.
 
+cURLyQ is a client-only React 19 SPA inside Tauri's webview: no server rendering, no Server Components or Server Actions, no router. Data comes from Tauri commands via `invoke()`, not from fetching.
+
 <when_to_use>
 
 - Building typed React components
 - Implementing generic components
 - Typing event handlers, forms, refs
-- Using React 19 features (Actions, Server Components, use())
-- Router integration (TanStack Router, React Router)
 - Custom hooks with proper typing
 
-NOT for: non-React TypeScript, vanilla JS React
+NOT for: non-React TypeScript, styling (see curlyq-ui)
 
 </when_to_use>
 
 <react_19_changes>
-
-React 19 breaking changes require migration. Key patterns:
 
 **ref as prop** - forwardRef deprecated:
 
@@ -38,29 +36,7 @@ function Button({ ref, children, ...props }: ButtonProps) {
 }
 ```
 
-**useActionState** - replaces useFormState:
-
-```typescript
-import { useActionState } from 'react';
-
-type FormState = { errors?: string[]; success?: boolean };
-
-function Form() {
-  const [state, formAction, isPending] = useActionState(submitAction, {});
-  return <form action={formAction}>...</form>;
-}
-```
-
-**use()** - unwraps promises/context:
-
-```typescript
-function UserProfile({ userPromise }: { userPromise: Promise<User> }) {
-  const user = use(userPromise); // Suspends until resolved
-  return <div>{user.name}</div>;
-}
-```
-
-See [react-19-patterns.md](references/react-19-patterns.md) for useOptimistic, useTransition, migration checklist.
+See [react-19-patterns.md](references/react-19-patterns.md) for ref patterns, useTransition, and useDeferredValue.
 
 </react_19_changes>
 
@@ -248,113 +224,6 @@ See [generic-components.md](examples/generic-components.md) for Select, List, Mo
 
 </generic_components>
 
-<server_components>
-
-React 19 Server Components run on server, can be async.
-
-**Async data fetching**:
-
-```typescript
-export default async function UserPage({ params }: { params: { id: string } }) {
-  const user = await fetchUser(params.id);
-  return <div>{user.name}</div>;
-}
-```
-
-**Server Actions** - 'use server' for mutations:
-
-```typescript
-'use server';
-
-export async function updateUser(userId: string, formData: FormData) {
-  await db.user.update({ where: { id: userId }, data: { ... } });
-  revalidatePath(`/users/${userId}`);
-}
-```
-
-**Client + Server Action**:
-
-```typescript
-'use client';
-
-import { useActionState } from 'react';
-import { updateUser } from '@/actions/user';
-
-function UserForm({ userId }: { userId: string }) {
-  const [state, formAction, isPending] = useActionState(
-    (prev, formData) => updateUser(userId, formData), {}
-  );
-  return <form action={formAction}>...</form>;
-}
-```
-
-**use() for promise handoff**:
-
-```typescript
-// Server: pass promise without await
-async function Page() {
-  const userPromise = fetchUser('123');
-  return <UserProfile userPromise={userPromise} />;
-}
-
-// Client: unwrap with use()
-'use client';
-function UserProfile({ userPromise }: { userPromise: Promise<User> }) {
-  const user = use(userPromise);
-  return <div>{user.name}</div>;
-}
-```
-
-See [server-components.md](examples/server-components.md) for parallel fetching, streaming, error boundaries.
-
-</server_components>
-
-<routing>
-
-Both TanStack Router and React Router v7 provide type-safe routing solutions.
-
-**TanStack Router** - Compile-time type safety with Zod validation:
-
-```typescript
-import { createRoute } from '@tanstack/react-router';
-import { z } from 'zod';
-
-const userRoute = createRoute({
-  path: '/users/$userId',
-  component: UserPage,
-  loader: async ({ params }) => ({ user: await fetchUser(params.userId) }),
-  validateSearch: z.object({
-    tab: z.enum(['profile', 'settings']).optional(),
-    page: z.number().int().positive().default(1),
-  }),
-});
-
-function UserPage() {
-  const { user } = useLoaderData({ from: userRoute.id });
-  const { tab, page } = useSearch({ from: userRoute.id });
-  const { userId } = useParams({ from: userRoute.id });
-}
-```
-
-**React Router v7** - Automatic type generation with Framework Mode:
-
-```typescript
-import type { Route } from "./+types/user";
-
-export async function loader({ params }: Route.LoaderArgs) {
-  return { user: await fetchUser(params.userId) };
-}
-
-export default function UserPage({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData; // Typed from loader
-  return <h1>{user.name}</h1>;
-}
-```
-
-See [tanstack-router.md](references/tanstack-router.md) for TanStack patterns and [react-router.md](references/react-router.md) for React Router patterns.
-
-</routing>
-
 <rules>
 
 ALWAYS:
@@ -364,17 +233,13 @@ ALWAYS:
 - Discriminated unions for variant props
 - as const for tuple returns
 - ref as prop in React 19 (no forwardRef)
-- useActionState for form actions
-- Type-safe routing patterns (see routing section)
 
 NEVER:
 - any for event handlers
 - JSX.Element for children (use ReactNode)
 - forwardRef in React 19+
-- useFormState (deprecated)
 - Forget null handling for DOM refs
-- Mix Server/Client components in same file
-- Await promises when passing to use()
+- Server Components, Server Actions, or 'use client'/'use server' directives — this is a client-only SPA
 
 </rules>
 
@@ -382,10 +247,7 @@ NEVER:
 
 - [hooks.md](references/hooks.md) - useState, useRef, useReducer, useContext, custom hooks
 - [event-handlers.md](references/event-handlers.md) - all event types, generic handlers
-- [react-19-patterns.md](references/react-19-patterns.md) - useActionState, use(), useOptimistic, migration
+- [react-19-patterns.md](references/react-19-patterns.md) - ref as prop, useTransition, useDeferredValue
 - [generic-components.md](examples/generic-components.md) - Table, Select, List, Modal patterns
-- [server-components.md](examples/server-components.md) - async components, Server Actions, streaming
-- [tanstack-router.md](references/tanstack-router.md) - TanStack Router typed routes, search params, navigation
-- [react-router.md](references/react-router.md) - React Router v7 loaders, actions, type generation, forms
 
 </references>
