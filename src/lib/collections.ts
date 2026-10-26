@@ -368,6 +368,21 @@ interface PostmanItem {
   name?: unknown;
   item?: unknown;
   request?: unknown;
+  event?: unknown;
+}
+
+interface ImportCounter {
+  skippedBody: number;
+  droppedScripts: number;
+}
+
+function countScripts(event: unknown): number {
+  if (!Array.isArray(event)) return 0;
+  return event.filter((e) => {
+    const exec = (e as { script?: { exec?: unknown } } | null)?.script?.exec;
+    const text = Array.isArray(exec) ? exec.join("\n") : exec;
+    return typeof text === "string" && text.trim() !== "";
+  }).length;
 }
 
 // Postman's `url` is either a string or an object with `raw`.
@@ -379,10 +394,11 @@ function rawUrlOf(url: unknown): string {
   return "";
 }
 
-// Unsupported body modes import as an empty body, counted in `counter.skippedBody`.
-function mapPostmanItems(items: unknown[], counter: { skippedBody: number }): CollectionNode[] {
+// Unsupported body modes import as an empty body; scripts aren't imported yet.
+function mapPostmanItems(items: unknown[], counter: ImportCounter): CollectionNode[] {
   return items.map((raw): CollectionNode => {
     const item = raw as PostmanItem;
+    counter.droppedScripts += countScripts(item.event);
     const name = typeof item.name === "string" && item.name.trim() !== "" ? item.name : "Untitled";
 
     if (Array.isArray(item.item)) {
@@ -428,7 +444,6 @@ function mapPostmanItems(items: unknown[], counter: { skippedBody: number }): Co
       params: parseParamsFromUrl(url),
       headers,
       body,
-      // Postman event scripts aren't imported yet.
       preRequestScript: "",
       postResponseScript: "",
     };
@@ -438,7 +453,7 @@ function mapPostmanItems(items: unknown[], counter: { skippedBody: number }): Co
 export function parsePostmanCollection(
   json: unknown,
   existing: Collection[]
-): { collection: Collection; skippedBodyCount: number } {
+): { collection: Collection; skippedBodyCount: number; droppedScriptCount: number } {
   if (typeof json !== "object" || json === null) {
     throw new PostmanImportError("Not a valid JSON file.");
   }
@@ -457,7 +472,7 @@ export function parsePostmanCollection(
   const rawName =
     typeof info.name === "string" && info.name.trim() !== "" ? info.name.trim() : "Imported collection";
 
-  const counter = { skippedBody: 0 };
+  const counter: ImportCounter = { skippedBody: 0, droppedScripts: countScripts(data.event) };
   const items = mapPostmanItems(data.item, counter);
 
   return {
@@ -467,6 +482,7 @@ export function parsePostmanCollection(
       items,
     },
     skippedBodyCount: counter.skippedBody,
+    droppedScriptCount: counter.droppedScripts,
   };
 }
 

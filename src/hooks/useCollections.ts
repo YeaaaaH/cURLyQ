@@ -142,14 +142,17 @@ export function useCollections({
       fallbackLabel: fileName,
       operation: async () => {
         const raw = await invoke<string>("read_text_file", { path });
-        const { collection, skippedBodyCount } = parsePostmanCollection(JSON.parse(raw), collections);
+        const { collection, skippedBodyCount, droppedScriptCount } = parsePostmanCollection(
+          JSON.parse(raw),
+          collections
+        );
         setCollections((prev) => [...prev, collection]);
-        const detail = describeCollectionCounts(collection.items);
-        const toastDescription =
-          skippedBodyCount > 0
-            ? `${detail} — ${pluralize(skippedBodyCount, "request")} had an unsupported body, imported empty`
-            : undefined;
-        return { label: collection.name, detail, toastDescription };
+        const warnings = [
+          skippedBodyCount > 0 && `${pluralize(skippedBodyCount, "request")} had an unsupported body, imported empty`,
+          droppedScriptCount > 0 && `${pluralize(droppedScriptCount, "script")} not imported`,
+        ].filter(Boolean);
+        const detail = [describeCollectionCounts(collection.items), ...warnings].join(" — ");
+        return { label: collection.name, detail };
       },
     });
   }, [collections, setCollections, onLogEntry]);
