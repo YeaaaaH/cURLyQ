@@ -31,13 +31,19 @@ Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
 (`src/lib/scripting/sandbox.worker.ts`), a separate JS thread with no access
 to the app's DOM, React state, or Tauri APIs. Two reasons:
 
-- **Isolation.** A script literally cannot reach anything in the app except
-  what's explicitly handed to it (see below). It can't read other tabs,
-  can't touch the file system, can't call Tauri commands.
+- **Isolation from the app.** A script can't reach anything in the app
+  except what's explicitly handed to it (see below). It can't read other
+  tabs, can't touch the file system, can't call Tauri commands.
 - **Hang safety.** An infinite loop in a script would freeze the whole
   window if it ran on the main thread. Running it in a Worker means a 5s
   timeout can `worker.terminate()` it instead — see `SCRIPT_TIMEOUT_MS` in
   `src/lib/scripting/runScript.ts`.
+
+> **Not a security boundary.** The Worker still has network access
+> (`fetch`, `XMLHttpRequest`), and every script sees the whole active
+> environment through `ctx.environment` — tokens and passwords included. A
+> script can send those anywhere. Only run scripts you wrote or have read,
+> and be careful with collections from someone else.
 
 Each script is called as a plain function body with three parameters:
 
@@ -75,7 +81,7 @@ kept; there's no history across sends yet.
 | `ctx.response.status` | post-response only | HTTP status code (number), read-only. |
 | `ctx.response.code` | post-response only | Same number as `.status` — Postman's name for it (in real Postman, `.status` is the reason phrase like `"OK"`, which cURLyQ doesn't have). |
 | `ctx.response.headers` | post-response only | Response headers as a plain object, read-only. |
-| `ctx.response.body` | post-response only | Raw response body text, read-only. |
+| `ctx.response.body` | post-response only | Raw response body text, read-only. Empty for a binary response (image, PDF, archive…). |
 | `ctx.response.json()` | post-response only | Parses `ctx.response.body` as JSON — throws if it isn't valid JSON. |
 | `console.log/warn/error(...)` | both | Captured — visible in the Logs tab. |
 
@@ -154,7 +160,7 @@ Deliberately out of scope for now — see `.tasks/plan.md`:
   `pm.variables` — calling them throws
 - `async`/`await` inside scripts — the script body runs synchronously
 - **Import** of Postman's `event`/`exec` script arrays — an imported Postman
-  collection's scripts are dropped. **Export** does write them: script text
+  collection's scripts are dropped, and the import log says how many. **Export** does write them: script text
   goes through a best-effort `ctx` → `pm` word-boundary rewrite, and the
   export toast says how many scripts were rewritten so you can double-check
   them.

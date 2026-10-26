@@ -22,12 +22,12 @@ Builds aren't code-signed yet, so the OS warns on first launch: on Windows, Smar
 
 ## Features
 
-- **Request builder** — method, URL with live query-param sync, headers, and a raw/JSON body (auto-sets `Content-Type: application/json`; `//` and `/* */` comments allowed). The response shows status, time, size, headers, and a pretty-printed body.
+- **Request builder** — method, URL with live query-param sync, headers, and a raw/JSON body (auto-sets `Content-Type: application/json`; `//` and `/* */` comments allowed, and kept by **Beautify**). **Ctrl+Enter** sends from anywhere, including the body and script editors. The response shows status, time, size, headers, and a pretty-printed body.
 - **Tabs** — multiple requests open at once, persisted across restarts. **Ctrl+S** saves a tab back to its collection; a dot marks tabs with unsaved changes.
 - **Environments** — `{{variable}}` substitution across URL/params/headers/body. Tokens are colored resolved / unresolved / circular; hovering one shows its value, lets you edit it, or creates a missing variable. The **Variables** panel lists every variable a request uses and the exact cURL command it will send.
-- **Collections** — Postman-style nested folders, drag-and-drop reordering and moving (including across collections), and a sidebar search across collections and environments.
+- **Collections** — Postman-style nested folders, drag-and-drop reordering and moving (including across collections), duplicating collections, folders, and requests, and a sidebar search across collections and environments.
 - **Collection run** — run every request in a collection or folder in order. Results open in their own tab; variables set by one request's scripts are visible to the next.
-- **Pre-request / post-response scripts** — sandboxed JavaScript per request that can read/write environment variables and (pre-request) override headers/body. Postman's `pm.*` API works for the supported subset. See [`docs/scripting.md`](./docs/scripting.md).
+- **Pre-request / post-response scripts** — sandboxed JavaScript per request that can read/write environment variables and (pre-request) override headers/body. Postman's `pm.*` API works for the supported subset. Scripts can reach the network and see every environment variable, so only run ones you trust. See [`docs/scripting.md`](./docs/scripting.md).
 - **Postman import/export** — environments and collections as Postman v2.1 JSON, including scripts on export.
 - **Themes** — light, dark, and terminal (a CRT-inspired palette), with a custom titlebar so the window chrome follows the theme too.
 
